@@ -20,6 +20,9 @@ class GameController {
   #gameId;
   #clients;
   #mutex = new Mutex();
+  #activeMonoRace = false;
+  #activeGroups = [];
+  #activeTowerIndex = false;
 
   constructor(...clients) {
     this.#server = io;
@@ -108,6 +111,28 @@ class GameController {
     console.error('Impossible happened! Player reached negative actions');
   };
 
+  onDrawCard = async (client) => {
+    if (this.#isNotCurrentPlayer(client.uid)) return;
+
+    const release = await this.#mutex.acquire();
+    try {
+      const cardIds = [this.#game.playerDraw()];
+      this.#whisper(client, PLAYER_MSG.CARDS_FROM_DECK, {
+        cardIds: cardIds,
+      });
+      this.#announce(GAME_MSG.PLAYER_GOT_CARDS, {
+        playerIndex: this.game.currentPlayer.index,
+        amount: cardIds.length,
+      });
+
+      this.#checkForActions();
+    } catch (error) {
+      client.emit('error', { message: error.message });
+    } finally {
+      release();
+    }
+  };
+
   onSwapCards = async (cardIndices, client) => {
     if (this.#isNotCurrentPlayer(client.uid)) return;
 
@@ -135,20 +160,19 @@ class GameController {
     }
   };
 
-  onDrawCard = async (client) => {
+  onPlayCard = async (cardIndex, targetSlotIndex, client) => {
     if (this.#isNotCurrentPlayer(client.uid)) return;
 
     const release = await this.#mutex.acquire();
     try {
-      const cardIds = [this.#game.playerDraw()];
-      this.#whisper(client, PLAYER_MSG.CARDS_FROM_DECK, {
-        cardIds: cardIds,
-      });
-      this.#announce(GAME_MSG.PLAYER_GOT_CARDS, {
-        playerIndex: this.game.currentPlayer.index,
-        amount: cardIds.length,
-      });
-
+      const result = (playerPlay = (cardIndex, targetSlotIndex));
+      if (result.isComplete) {
+        this.#activeMonoRace = result.monoRace;
+        this.#activeGroups = result.groups;
+        this.#activeTowerIndex = result.index;
+      }
+      //TODO send Fear(monoRace)
+      //TODO send activeGroup in fear
       this.#checkForActions();
     } catch (error) {
       client.emit('error', { message: error.message });
@@ -156,6 +180,9 @@ class GameController {
       release();
     }
   };
+
+  onEndFear() {} //TODO
+  onEndGroup() {} //TODO
 }
 
 module.exports = { GameController };

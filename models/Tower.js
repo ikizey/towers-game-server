@@ -10,7 +10,7 @@ class Tower {
   #slots = [null, null, null]; // BASE, MIDDLE, TOP
 
   constructor(id) {
-    this.id = id;
+    this.#id = id;
   }
 
   get nextEmptySlot() {
@@ -35,7 +35,7 @@ class Tower {
   }
 
   get cards() {
-    return this.#slots.filter((slot) => slot !== null);
+    return this.#slots.filter((slot) => slot !== null).reverse();
   }
 
   get isComplete() {
@@ -57,14 +57,28 @@ class Tower {
     );
   }
 
+  get #monoRace() {
+    return this.isMonoRace ? this.cards[0].race : false;
+  }
+
   get isDestroyed() {
     return this.#slots[TOWER_SLOTS.BASE] === null;
   }
 
   build = (card) => {
-    if (this.#cantBuild(card.slots)) return;
+    // if (this.#cantBuild(card.slots)) return; //TODO! Throw
 
     this.#slots[this.nextEmptySlot] = card;
+
+    if (this.isComplete) {
+      return {
+        isComplete: this.isComplete,
+        monoRace: this.#monoRace,
+        groups: this.cards.map((card) => card.group),
+        index: this.#id,
+      };
+    }
+    return { isComplete };
   };
 
   destroyTop = () => {

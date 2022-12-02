@@ -26,7 +26,7 @@ class Towers {
   };
 
   buildTower = (card, towerIndex) => {
-    this.#towers[towerIndex].build(card);
+    return this.#towers[towerIndex].build(card);
   };
 }
 

@@ -81,6 +81,7 @@ class Game {
     try {
       const card = this.#dealer.askCard();
       this.currentPlayer.draw(card);
+
       this.currentPlayer.decreaseActions();
       return card.id;
     } catch (error) {
@@ -107,11 +108,20 @@ class Game {
     );
   }
 
-  playerPlay = (cardId, towerId) => {
-    if (!this.playableCardsAndTargets.includes(cardId)) return;
+  //* gameController logic spilled
+  playerPlay = (cardIndex, targetSlotIndex) => {
+    if (!this.currentPlayTargets[cardIndex]?.includes(targetSlotIndex)) {
+      throw new Error("You can't build this tower with this card!");
+    }
 
+    const cardId = this.currentPlayer.cards[cardIndex].id;
+    const towerIndex = Math.floor(targetSlotIndex / 3);
     const card = this.currentPlayer.remove(cardId);
-    this.currentPlayer.towers.buildTower(card, towerId);
+    const result = this.currentPlayer.towers.buildTower(card, towerIndex);
+
+    this.#decreaseActions();
+
+    return result;
   };
 
   get canSwap() {
