@@ -3,16 +3,21 @@ const { Player } = require('../models/Player');
 const { shuffle } = require('../globals');
 
 class Game {
-  #gameRules = { ActionsPerTurn: 2, SwapCardsRatio: 2, MaxTowers: 5 };
+  gameRules = Object.freeze({
+    ActionsPerTurn: 2,
+    SwapCardsRatio: 2,
+    MaxTowers: 5,
+    StartWithCards: 5,
+  });
   #dealer = new Dealer();
   #players = [];
-  #currentPlayerIndex = 0;
+  #currentPlayerIndex = -1;
   #playersAmount;
   #currentPlayerActions = 0;
 
   constructor(...clients) {
     const players = clients.map(
-      (client) => new Player(client.uid, client.name, this.#gameRules.MaxTowers)
+      (client) => new Player(client.uid, client.name, this.gameRules.MaxTowers)
     );
 
     this.#playersAmount = players.length;
@@ -20,17 +25,49 @@ class Game {
     this.players = players;
   }
 
+  get playersInfo() {
+    return this.#players.map((player) => ({
+      id: player.id,
+      name: player.name,
+    }));
+  }
+
   #decreaseActions = () => {
     this.#currentPlayerActions -= 1;
   };
 
   #resetActions = () => {
-    this.#currentPlayerActions = this.#gameRules.ActionsPerTurn;
+    this.#currentPlayerActions = this.gameRules.ActionsPerTurn;
   };
 
-  get #currentPlayer() {
+  get currentPlayer() {
     return this.#players[this.#currentPlayerIndex];
   }
+
+  get currentPlayerIndex() {
+    return this.#currentPlayerIndex;
+  }
+
+  begin = () => {
+    const cardSets = [];
+    this.#players.forEach((player) => {
+      const cards = [];
+      for (let i = this.gameRules.StartWithCards; i > 0; i -= 1) {
+        const card = this.#dealer.askCard();
+        player.drawCard(card);
+        cards.push(card);
+      }
+      cardSets.push(cards);
+    });
+    return cardSets;
+  };
+
+  nextPlayer = () => {
+    this.#currentPlayerIndex =
+      (this.currentPlayerIndex + 1) % this.#playersAmount;
+    this.#resetActions();
+    return this.#currentPlayerIndex;
+  };
 
   get canDrawCard() {
     return this.#dealer.canDeal;
@@ -39,57 +76,66 @@ class Game {
   playerDraw = () => {
     try {
       const card = this.#dealer.askCard();
-      this.#currentPlayer.draw(card);
-      this.#currentPlayer.decreaseActions();
+      this.currentPlayer.draw(card);
+      this.currentPlayer.decreaseActions();
     } catch (error) {
       throw error;
     }
   };
+  //* gameController logic spilled
+  get #usableSlotsIndices() {
+    return this.currentPlayer.towers
+      .map((tower, index) =>
+        tower.nextEmptySlot !== null
+          ? tower.nextEmptySlot + index + index * 2 // magic
+          : null
+      )
+      .filter((index) => index !== null);
+  }
+  //* gameController logic spilled
+  get currentPlayTargets() {
+    const cards = this.currentPlayer.hand;
+    const availableSlots = this.#usableSlotsIndices;
 
-  get playableCardIds() {
-    const cards = this.#currentPlayer.hand;
-    const availableSlots = this.#currentPlayer.towers.usableSlots;
-
-    if (availableSlots === null) return null;
-    return cards
-      .filter((card) => card.slots.includes(availableSlots))
-      .map((card) => card.id);
+    return cards.maps(
+      (card) => availableSlots.map((slot) => card.slot === slot % 3) //reverse magic
+    );
   }
 
   playerPlay = (cardId, towerId) => {
-    if (!this.playableCardIds.includes(cardId)) return;
+    if (!this.playableCardsAndTargets.includes(cardId)) return;
 
-    const card = this.#currentPlayer.remove(cardId);
-    this.#currentPlayer.towers.buildTower(card, towerId);
+    const card = this.currentPlayer.remove(cardId);
+    this.currentPlayer.towers.buildTower(card, towerId);
   };
 
   get canSwap() {
     return (
-      this.#currentPlayer.hand.length < this.#gameRules.SwapCardsRatio &&
+      this.currentPlayer.hand.length < this.gameRules.SwapCardsRatio &&
       this.#dealer.canDeal
     );
   }
 
   playerSwapCards = (...cardIndices) => {
     const lostAmount = cardIndices.length;
-    if (lostAmount < this.#gameRules.SwapCardsRatio) {
+    if (lostAmount < this.gameRules.SwapCardsRatio) {
       throw new Error(
-        `Should swap at least ${this.#gameRules.SwapCardsRatio} cards.`
+        `Should swap at least ${this.gameRules.SwapCardsRatio} cards.`
       );
     }
 
-    const gainAmount = Math.floor(lostAmount / this.#gameRules.SwapCardsRatio);
+    const gainAmount = Math.floor(lostAmount / this.gameRules.SwapCardsRatio);
     if (gainAmount > this.#dealer.CardsTotal) {
       throw new Error(`Not Enough cards in the deck. Choose less cards`);
     }
 
-    this.#currentPlayer.discardCards(...cardIndices);
+    this.currentPlayer.discardCards(...cardIndices);
 
     let gotCardsIds = [];
     for (let amount = gainAmount; amount > 0; amount -= 1) {
       const card = this.#dealer.askCard();
       gotCardsIds.push(card);
-      this.#currentPlayer.drawCard(card);
+      this.currentPlayer.drawCard(card);
     }
 
     this.#decreaseActions();
