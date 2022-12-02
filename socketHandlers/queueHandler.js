@@ -17,7 +17,7 @@ const queueHandler = (io, client) => {
       return;
     }
 
-    const gameController = new GameController(io, client, opponent);
+    const gameController = new GameController(client, opponent);
     client.gameController = gameController;
     opponent.gameController = gameController;
   };
