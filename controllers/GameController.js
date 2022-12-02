@@ -1,12 +1,23 @@
+const Mutex = require('async-mutex').Mutex;
 const { Game } = require('../models/Game');
-const { Player } = require('../models/Player');
+const { io } = require('../index');
+
+const MSG_TO_ALL = Object.freeze({
+  PLAYER_LOST_CARDS: 'player-lost-cards',
+  PLAYER_GOT_CARDS: 'player-got-cards',
+});
+
+const MSG_TO_PLAYER = Object.freeze({
+  CARDS_FROM_DECK: 'cards-from-deck',
+});
 
 class GameController {
   #game;
   #server;
   #roomId;
+  #mutex = new Mutex();
 
-  constructor(io, ...clients) {
+  constructor(...clients) {
     this.#server = io;
 
     clients.sort((p1, p2) => p1.uid - p2.uid);
@@ -19,34 +30,45 @@ class GameController {
       client.join(gameId);
     });
 
-    const players = clients.map(
-      (client) => new Player(client.uid, client.name)
-    );
-    this.#game = new Game(...players);
+    this.#game = new Game(...clients);
   }
 
-  get #currentPlayerId() {
-    this.#game.currentPlayer.id;
-  }
+  #toAll = (MessageType, data) => {
+    this.#server.in(this.#gameId).emit(MessageType, data);
+  };
 
-  onSwapCards = ({ gameId, cardIndices, player }) => {
-    const game = this.#gameById(gameId);
-    if (player.id !== this.#game.currentPlayer.id) return;
+  #toClient = (client, messageType, data) => {
+    client.emit(messageType, data);
+  };
+
+  #isCurrentPlayer = (clientUid) => {
+    return this.#game.currentPlayer.id === clientUid;
+  };
+
+  #isNotCurrentPlayer = (clientUid) => {
+    return !this.#isCurrentPlayer(clientUid);
+  };
+
+  onSwapCards = async ({ cardIndices, client }) => {
+    if (this.#isNotCurrentPlayer(client.uid)) return;
+
+    const release = await this.#mutex.acquire();
     try {
-      const { gotCardsIds, lostCardsIndices } = game.playerSwapCards(
-        player.id,
-        ...cardIndices
-      );
-      this.#server
-        .in(gameId)
-        .emit('player-lost-cards', { playerId: player.id, lostCardIndices });
-      player.emit('cards-from-deck', { cardIds: cardIndices });
-      this.#server.in(gameId).emit('player-got-cards', {
-        socket: player.id,
+      const gotCardsIds = game.playerSwapCards(...cardIndices);
+      this.#toAll(MSG_TO_ALL.PLAYER_LOST_CARDS),
+        {
+          playerId: this.#game.currentPlayer.id,
+          lostCardIndices,
+        };
+      this.#toClient(client, MSG_TO_PLAYER.CARDS_FROM_DECK, {
+        cardIds: gotCardsIds,
+      });
+      this.#toAll(MSG_TO_ALL.PLAYER_GOT_CARDS, {
+        playerId: this.#game.currentPlayer.id,
         amount: gotCardsIds.length,
       });
     } catch (error) {
-      player.emit('error', { message: error.message });
+      client.emit('error', { message: error.message });
     }
   };
 }
