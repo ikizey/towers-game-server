@@ -7,10 +7,10 @@ const { io } = require('../index');
 const connectionHandler = (client) => {
   console.info('client connected: ' + client.id);
 
-  connectHandler(io, client);
+  connectHandler(client);
   gameHandler(io, client);
   queueHandler(io, client);
-  disconnectHandler(io, client);
+  disconnectHandler(client);
 };
 
 module.exports = { connectionHandler };
