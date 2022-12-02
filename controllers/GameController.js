@@ -78,8 +78,10 @@ class GameController {
   };
 
   #beginTurn = () => {
-    const currentPlayerIndex = this.#game.nextPlayer();
-    this.#announce(GAME_MSG.NEW_TURN, { playerIndex: currentClientIndex });
+    this.#game.nextPlayer();
+    this.#announce(GAME_MSG.NEW_TURN, {
+      playerIndex: this.#game.currentPlayerIndex,
+    });
   };
 
   #beginAction = () => {
@@ -95,24 +97,59 @@ class GameController {
     this.#whisper(client, NEW_PHASE, actions);
   };
 
-  onSwapCards = async ({ cardIndices, client }) => {
+  #checkForActions = () => {
+    if (this.#game.currentPlayerActions === 0) {
+      this.#beginTurn();
+    }
+    if (this.#game.currentPlayerActions >= 0) {
+      this.#beginAction();
+      return;
+    }
+    console.error('Impossible happened! Player reached negative actions');
+  };
+
+  onSwapCards = async (cardIndices, client) => {
     if (this.#isNotCurrentPlayer(client.uid)) return;
 
     const release = await this.#mutex.acquire();
     try {
-      const gotCardsIds = game.playerSwapCards(...cardIndices);
+      const cardIds = game.playerSwapCards(...cardIndices);
       this.#announce(GAME_MSG.PLAYER_LOST_CARDS),
         {
           playerId: this.#game.currentPlayer.id,
           lostCardIndices,
         };
       this.#whisper(client, PLAYER_MSG.CARDS_FROM_DECK, {
-        cardIds: gotCardsIds,
+        cardIds: cardIds,
       });
       this.#announce(GAME_MSG.PLAYER_GOT_CARDS, {
-        playerId: this.#game.currentPlayer.id,
-        amount: gotCardsIds.length,
+        playerIndex: this.game.currentPlayer.index,
+        amount: cardIds.length,
       });
+
+      this.#checkForActions();
+    } catch (error) {
+      client.emit('error', { message: error.message });
+    } finally {
+      release();
+    }
+  };
+
+  onDrawCard = async (client) => {
+    if (this.#isNotCurrentPlayer(client.uid)) return;
+
+    const release = await this.#mutex.acquire();
+    try {
+      const cardIds = [this.#game.playerDraw()];
+      this.#whisper(client, PLAYER_MSG.CARDS_FROM_DECK, {
+        cardIds: cardIds,
+      });
+      this.#announce(GAME_MSG.PLAYER_GOT_CARDS, {
+        playerIndex: this.game.currentPlayer.index,
+        amount: cardIds.length,
+      });
+
+      this.#checkForActions();
     } catch (error) {
       client.emit('error', { message: error.message });
     } finally {

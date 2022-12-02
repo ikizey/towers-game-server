@@ -40,6 +40,10 @@ class Game {
     this.#currentPlayerActions = this.gameRules.ActionsPerTurn;
   };
 
+  get currentPlayerActions() {
+    return this.#currentPlayerActions;
+  }
+
   get currentPlayer() {
     return this.#players[this.#currentPlayerIndex];
   }
@@ -78,6 +82,7 @@ class Game {
       const card = this.#dealer.askCard();
       this.currentPlayer.draw(card);
       this.currentPlayer.decreaseActions();
+      return card.id;
     } catch (error) {
       throw error;
     }
