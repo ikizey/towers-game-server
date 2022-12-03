@@ -8,6 +8,7 @@ const GAME_MSG = Object.freeze({
   PLAYER_GOT_CARDS: 'player-got-cards',
   PLAYER_LOST_CARDS: 'player-lost-cards',
   CARD_PLAYED: 'card-played',
+  WAR_CRY: 'war-cry',
 });
 
 const PLAYER_MSG = Object.freeze({
@@ -21,7 +22,7 @@ class GameController {
   #gameId;
   #clients;
   #mutex = new Mutex();
-  #activeMonoRace = false;
+  #activeWarCry = false;
   #activeGroups = [];
   #activeTowerIndex = false;
 
@@ -68,16 +69,24 @@ class GameController {
     return !this.#isCurrentPlayer(clientUid);
   };
 
+  #announceCardsAddedToHand = (amount, index) => {
+    this.#announce(GAME_MSG.PLAYER_GOT_CARDS, {
+      playerIndex: index || this.game.currentPlayer.index,
+      amount: amount,
+    });
+  };
+
+  #whisperCardsAddedToHand = (client, cardIds) => {
+    this.#whisper(client, PLAYER_MSG.CARDS_FROM_DECK, {
+      cardIds: cardIds,
+    });
+  };
+
   #beginGame = () => {
     const cardSets = this.#game.begin();
     this.#clients.forEach((client, index) => {
-      this.#whisper(client, CARDS_FROM_DECK, {
-        cardIds: [...cardSets[index]],
-      });
-      this.#to(AllGAME_MSG.PLAYER_GOT_CARDS, {
-        playerIndex: index,
-        amount: gotCardsIds.length,
-      });
+      this.#whisperCardsAddedToHand(client, [...cardSets[index]]);
+      this.#announceCardsAddedToHand(cardSets[index].length, index);
     });
   };
 
@@ -119,13 +128,8 @@ class GameController {
     if (this.#game.currentPlayerActions < 1) return;
     try {
       const cardIds = [this.#game.playerDraw()];
-      this.#whisper(client, PLAYER_MSG.CARDS_FROM_DECK, {
-        cardIds: cardIds,
-      });
-      this.#announce(GAME_MSG.PLAYER_GOT_CARDS, {
-        playerIndex: this.game.currentPlayer.index,
-        amount: cardIds.length,
-      });
+      this.#whisperCardsAddedToHand(client, cardIds);
+      this.#announceCardsAddedToHand(cardIds.length);
 
       this.#checkForActions();
     } catch (error) {
@@ -133,6 +137,14 @@ class GameController {
     } finally {
       release();
     }
+  };
+
+  #announceCardsLeaveHand = () => {
+    this.#announce(GAME_MSG.PLAYER_LOST_CARDS),
+      {
+        playerId: this.#game.currentPlayer.id,
+        lostCardIndices,
+      };
   };
 
   onSwapCards = async (cardIndices, client) => {
@@ -142,18 +154,9 @@ class GameController {
     if (this.#game.currentPlayerActions < 1) return;
     try {
       const cardIds = game.playerSwapCards(...cardIndices);
-      this.#announce(GAME_MSG.PLAYER_LOST_CARDS),
-        {
-          playerId: this.#game.currentPlayer.id,
-          lostCardIndices,
-        };
-      this.#whisper(client, PLAYER_MSG.CARDS_FROM_DECK, {
-        cardIds: cardIds,
-      });
-      this.#announce(GAME_MSG.PLAYER_GOT_CARDS, {
-        playerIndex: this.game.currentPlayer.index,
-        amount: cardIds.length,
-      });
+      this.#announceCardsLeaveHand();
+      this.#whisperCardsAddedToHand(client, cardIds);
+      this.#announceCardsAddedToHand(cardIds.length);
 
       this.#checkForActions();
     } catch (error) {
@@ -161,6 +164,23 @@ class GameController {
     } finally {
       release();
     }
+  };
+
+  #setBuildResults = (result) => {
+    if (result.isComplete) {
+      this.#activeWarCry = result.monoRace;
+      this.#activeGroups = result.groups;
+      this.#activeTowerIndex = result.index;
+    }
+  };
+
+  #announceCardPlayed = (cardIndex, targetSlotIndex, cardId) => {
+    this.#announce(GAME_MSG.CARD_PLAYED, {
+      playerIndex: this.game.currentPlayerIndex,
+      cardIndex,
+      targetSlotIndex,
+      cardId: cardId,
+    });
   };
 
   onPlayCard = async (cardIndex, targetSlotIndex, client) => {
@@ -169,23 +189,9 @@ class GameController {
     const release = await this.#mutex.acquire();
     if (this.#game.currentPlayerActions < 1) return;
     try {
-      const result = (playerPlay = (cardIndex, targetSlotIndex));
-      if (result.isComplete) {
-        this.#activeMonoRace = result.monoRace;
-        this.#activeGroups = result.groups;
-        this.#activeTowerIndex = result.index;
-      }
-
-      this.#announce(GAME_MSG.CARD_PLAYED, {
-        playerIndex: this.game.currentPlayerIndex,
-        cardIndex,
-        targetSlotIndex,
-        cardId: result.cardId,
-      });
-
-      //TODO send Fear(monoRace)
-      //TODO send activeGroup in fear
-      this.#checkForActions();
+      const result = playerPlay(cardIndex, targetSlotIndex);
+      this.#setBuildResults(result);
+      this.#announceCardPlayed(cardIndex, targetSlotIndex, result.cardId);
     } catch (error) {
       client.emit('error', { message: error.message });
     } finally {
@@ -193,7 +199,32 @@ class GameController {
     }
   };
 
-  onEndFear() {} //TODO
+  #announceWarCry = () => {
+    this.#announce(GAME_MSG.WAR_CRY, {
+      playerIndex: this.game.currentPlayerIndex,
+      race: this.#activeWarCry,
+    });
+  };
+
+  onStartCardResolution = async (client) => {
+    if (this.#isNotCurrentPlayer(client.uid)) return;
+
+    const release = await this.#mutex.acquire();
+    try {
+      if (this.#activeWarCry) {
+        this.#announceWarCry();
+      } else if (this.#activeGroups.length > 0) {
+        //TODO
+      } else {
+        this.#checkForActions();
+      }
+    } catch (error) {
+      client.emit('error', { message: error.message });
+    } finally {
+      release();
+    }
+  };
+
   onEndGroup() {} //TODO
 }
 
