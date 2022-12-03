@@ -2,18 +2,38 @@ const { Dealer } = require('./Dealer');
 const { Player } = require('../models/Player');
 const { shuffle } = require('../globals');
 
+class ActionError extends Error {
+  constructor(message) {
+    super(message);
+  }
+}
+
+class WarCryError extends Error {
+  constructor(message) {
+    super(message);
+  }
+}
 class Game {
   gameRules = Object.freeze({
     ActionsPerTurn: 2,
     SwapCardsRatio: 2,
     MaxTowers: 5,
     StartWithCards: 5,
+    WarCryDiscardSameRace: 1,
+    WarCryDiscardOtherRace: 2,
   });
   #dealer = new Dealer();
   #players = [];
   #currentPlayerIndex = -1;
   #playersAmount;
   #currentPlayerActions = 0;
+  //warCry
+  activeWarCryRace = false;
+  warCryDone;
+  //
+  activeGroups;
+  //completed Tower
+  activeTowerIndex;
 
   constructor(...clients) {
     const players = clients.map(
@@ -108,10 +128,21 @@ class Game {
     );
   }
 
+  #setBuildResults = (result) => {
+    if (result.isComplete) {
+      this.activeWarCry = result.monoRace;
+      this.activeGroups = result.groups;
+      this.activeTowerIndex = result.index;
+      if (result.monoRace) {
+        this.warCryDone = this.#players.map((_) => 0);
+      }
+    }
+  };
+
   //* gameController logic spilled
-  playerPlay = (cardIndex, targetSlotIndex) => {
+  build = (cardIndex, targetSlotIndex) => {
     if (!this.currentPlayTargets[cardIndex]?.includes(targetSlotIndex)) {
-      throw new Error("You can't build this tower with this card!");
+      throw new ActionError("You can't build this tower with this card!");
     }
 
     const cardId = this.currentPlayer.cards[cardIndex].id;
@@ -119,6 +150,7 @@ class Game {
     const card = this.currentPlayer.discardCards([cardIndex])[0];
     const buildResult = this.currentPlayer.towers.buildTower(card, towerIndex);
     const result = { ...buildResult, cardId };
+    this.#setBuildResults(result);
 
     this.#decreaseActions();
 
@@ -132,17 +164,17 @@ class Game {
     );
   }
 
-  playerSwapCards = (...cardIndices) => {
+  swapCards = (...cardIndices) => {
     const lostAmount = cardIndices.length;
     if (lostAmount < this.gameRules.SwapCardsRatio) {
-      throw new Error(
+      throw new ActionError(
         `Should swap at least ${this.gameRules.SwapCardsRatio} cards.`
       );
     }
 
     const gainAmount = Math.floor(lostAmount / this.gameRules.SwapCardsRatio);
     if (gainAmount > this.#dealer.CardsTotal) {
-      throw new Error(`Not Enough cards in the deck. Choose less cards`);
+      throw new ActionError(`Not Enough cards in the deck. Choose less cards`);
     }
 
     this.currentPlayer.discardCards(...cardIndices);
@@ -158,6 +190,66 @@ class Game {
 
     return gotCardsIds;
   };
+
+  #checkWrongCards = (discardAmount, cardRacesToDiscard) => {
+    return (
+      (discardAmount === this.gameRules.WarCryDiscardSameRace &&
+        !cardRacesToDiscard.includes(activeWarCry)) ||
+      (discardAmount === this.gameRules.WarCryDiscardOtherRace &&
+        cardRacesToDiscard.includes(activeWarCry))
+    );
+  };
+
+  #checkTooFewCards = (discardAmount, cardRacesToDiscard) => {
+    return (
+      (cardRacesToDiscard.includes(activeWarCry) &&
+        discardAmount < this.gameRules.WarCryDiscardSameRace) ||
+      (!cardRacesToDiscard.includes(activeWarCry) &&
+        discardAmount < this.gameRules.WarCryDiscardOtherRace)
+    );
+  };
+
+  #checkTooManyCards = (discardAmount, cardRacesToDiscard) => {
+    return (
+      (cardRacesToDiscard.includes(activeWarCry) &&
+        discardAmount > this.gameRules.WarCryDiscardSameRace) ||
+      (!cardRacesToDiscard.includes(activeWarCry) &&
+        discardAmount > this.gameRules.WarCryDiscardOtherRace)
+    );
+  };
+
+  get #warCryIsDone() {
+    return !this.warCryDone.some((discardAmount) => discardAmount === 0);
+  }
+
+  WarCryDiscard = (playerIndex, ...cardIndices) => {
+    const player = this.#players[playerIndex];
+    const discardAmount = cardIndices.length;
+    const cardRacesToDiscard = player.cards
+      .filter((_, index) => cardIndices.includes(index))
+      .map((card) => card.race);
+    if (this.#checkWrongCards(discardAmount, cardRacesToDiscard)) {
+      throw new WarCryError(`Wrong cards.`);
+    }
+    if (this.#checkTooFewCards(discardAmount, cardRacesToDiscard)) {
+      throw new WarCryError(`You must discard more cards.`);
+    }
+    if (this.#checkTooManyCards(discardAmount, cardRacesToDiscard)) {
+      throw new WarCryError(`You must discard less cards.`);
+    }
+
+    player.discardCards(...cardIndices);
+    this.warCryDone[playerIndex] = discardAmount;
+
+    if (this.#warCryIsDone) {
+      this.activeWarCryRace = false;
+      this.warCryDone = undefined;
+    }
+  };
 }
 
-module.exports = { Game };
+module.exports = {
+  Game,
+  ActionError,
+  WarCryError,
+};

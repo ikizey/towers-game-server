@@ -1,5 +1,5 @@
 const Mutex = require('async-mutex').Mutex;
-const { Game } = require('../models/Game');
+const { Game, ActionError } = require('../models/Game');
 const { io } = require('../index');
 
 const GAME_MSG = Object.freeze({
@@ -9,6 +9,7 @@ const GAME_MSG = Object.freeze({
   PLAYER_LOST_CARDS: 'player-lost-cards',
   CARD_PLAYED: 'card-played',
   WAR_CRY: 'war-cry',
+  GROUP: 'group',
 });
 
 const PLAYER_MSG = Object.freeze({
@@ -22,9 +23,6 @@ class GameController {
   #gameId;
   #clients;
   #mutex = new Mutex();
-  #activeWarCry = false;
-  #activeGroups = [];
-  #activeTowerIndex = false;
 
   constructor(...clients) {
     this.#server = io;
@@ -71,7 +69,7 @@ class GameController {
 
   #announceCardsAddedToHand = (amount, index) => {
     this.#announce(GAME_MSG.PLAYER_GOT_CARDS, {
-      playerIndex: index || this.game.currentPlayer.index,
+      playerIndex: index || this.#game.currentPlayer.index,
       amount: amount,
     });
   };
@@ -98,9 +96,9 @@ class GameController {
   };
 
   #beginAction = () => {
-    const canDraw = this.game.canDrawCard;
-    const canSwap = this.game.canSwap;
-    const canPlay = this.game.currentPlayTargets;
+    const canDraw = this.#game.canDrawCard;
+    const canSwap = this.#game.canSwap;
+    const canPlay = this.#game.currentPlayTargets;
     const client = this.clients[this.#game.currentPlayerIndex];
     const actions = {
       canDraw,
@@ -133,17 +131,18 @@ class GameController {
 
       this.#checkForActions();
     } catch (error) {
+      this.#beginAction();
       client.emit('error', { message: error.message });
     } finally {
       release();
     }
   };
 
-  #announceCardsLeaveHand = () => {
+  #announceCardsLeaveHand = (playerIndex, ...cardIndices) => {
     this.#announce(GAME_MSG.PLAYER_LOST_CARDS),
       {
-        playerId: this.#game.currentPlayer.id,
-        lostCardIndices,
+        playerIndex: playerIndex || this.#game.currentPlayerIndex,
+        cardIndices,
       };
   };
 
@@ -153,46 +152,40 @@ class GameController {
     const release = await this.#mutex.acquire();
     if (this.#game.currentPlayerActions < 1) return;
     try {
-      const cardIds = game.playerSwapCards(...cardIndices);
-      this.#announceCardsLeaveHand();
+      const cardIds = this.#game.swapCards(...cardIndices);
+      this.#announceCardsLeaveHand(...cardIndices);
       this.#whisperCardsAddedToHand(client, cardIds);
       this.#announceCardsAddedToHand(cardIds.length);
 
       this.#checkForActions();
     } catch (error) {
+      this.#beginAction();
       client.emit('error', { message: error.message });
     } finally {
       release();
     }
   };
 
-  #setBuildResults = (result) => {
-    if (result.isComplete) {
-      this.#activeWarCry = result.monoRace;
-      this.#activeGroups = result.groups;
-      this.#activeTowerIndex = result.index;
-    }
-  };
-
-  #announceCardPlayed = (cardIndex, targetSlotIndex, cardId) => {
+  #announceBuilt = (cardIndex, targetSlotIndex, cardId) => {
     this.#announce(GAME_MSG.CARD_PLAYED, {
-      playerIndex: this.game.currentPlayerIndex,
+      playerIndex: this.#game.currentPlayerIndex,
       cardIndex,
       targetSlotIndex,
-      cardId: cardId,
+      cardId,
     });
   };
 
-  onPlayCard = async (cardIndex, targetSlotIndex, client) => {
+  onBuild = async (cardIndex, targetSlotIndex, client) => {
     if (this.#isNotCurrentPlayer(client.uid)) return;
 
     const release = await this.#mutex.acquire();
     if (this.#game.currentPlayerActions < 1) return;
     try {
-      const result = playerPlay(cardIndex, targetSlotIndex);
+      const result = this.#game.build(cardIndex, targetSlotIndex);
       this.#setBuildResults(result);
-      this.#announceCardPlayed(cardIndex, targetSlotIndex, result.cardId);
+      this.#announceBuilt(cardIndex, targetSlotIndex, result.cardId);
     } catch (error) {
+      this.#beginAction();
       client.emit('error', { message: error.message });
     } finally {
       release();
@@ -201,9 +194,20 @@ class GameController {
 
   #announceWarCry = () => {
     this.#announce(GAME_MSG.WAR_CRY, {
-      playerIndex: this.game.currentPlayerIndex,
-      race: this.#activeWarCry,
+      playerIndex: this.#game.currentPlayerIndex,
+      race: this.#game.activeWarCryRace,
     });
+  };
+
+  #whisperWarCry = (client) => {
+    this.#whisper(client, GAME_MSG.WAR_CRY, {
+      playerIndex: this.#game.currentPlayerIndex,
+      race: this.#game.activeWarCryRace,
+    });
+  };
+
+  #announceAbility = () => {
+    this.#announce(GAME_MSG.GROUP, {});
   };
 
   onStartCardResolution = async (client) => {
@@ -211,14 +215,43 @@ class GameController {
 
     const release = await this.#mutex.acquire();
     try {
-      if (this.#activeWarCry) {
+      if (this.#game.activeWarCryRace) {
         this.#announceWarCry();
-      } else if (this.#activeGroups.length > 0) {
-        //TODO
+      } else if (this.#game.activeGroups.length > 0) {
+        this.#announceAbility();
       } else {
         this.#checkForActions();
       }
     } catch (error) {
+      client.emit('error', { message: error.message });
+    } finally {
+      release();
+    }
+  };
+
+  #isAlreadyDiscarded = (playerIndex) => {
+    return (
+      this.#game.warCryDone[playerIndex] >= this.#game.gameRules.WarCryDiscard
+    );
+  };
+
+  #playerIndex = (clientUid) => {
+    return this.#clients.findIndex((client) => client.uid === clientUid);
+  };
+
+  onWarCryResolution = async (cardIndices, client) => {
+    const release = await this.#mutex.acquire();
+    const playerIndex = this.#playerIndex(client.uid);
+    if (this.#isAlreadyDiscarded(playerIndex)) return;
+    try {
+      this.#game.WarCryDiscard(playerIndex, ...cardIndices);
+      this.#announceCardsLeaveHand(playerIndex, ...cardIndices);
+
+      if (!this.#game.activeWarCryRace) {
+        this.#announceAbility();
+      }
+    } catch (error) {
+      this.#whisperWarCry(client);
       client.emit('error', { message: error.message });
     } finally {
       release();
