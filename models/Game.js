@@ -13,6 +13,12 @@ class WarCryError extends Error {
     super(message);
   }
 }
+
+class AbilityError extends Error {
+  constructor(message) {
+    super(message);
+  }
+}
 class Game {
   gameRules = Object.freeze({
     ActionsPerTurn: 2,
@@ -198,7 +204,7 @@ class Game {
 
     const gainAmount = Math.floor(lostAmount / this.gameRules.SwapCardsRatio);
     if (gainAmount > this.#dealer.CardsTotal) {
-      throw new ActionError(`Not Enough cards in the deck. Choose less cards`);
+      throw new ActionError('Not Enough cards in the deck. Choose less cards.');
     }
 
     this.currentPlayer.discardCards(...cardIndices);
@@ -271,12 +277,35 @@ class Game {
     }
   };
 
-  #removeAction = () => {
+  #removeGroup = () => {
     this.activeGroups.splice(0, 1);
   };
 
+  #resetGroups = () => {
+    this.activeGroups.splice(0);
+  };
+
+  groupFailed = () => {
+    this.#resetGroups();
+  };
+
   groupNone = () => {
-    this.#removeAction();
+    this.#removeGroup();
+  };
+
+  groupOracle = () => {
+    if (this.#dealer.CardsTotal < 2) {
+      throw new AbilityError('Not enough cards for group.');
+    }
+
+    try {
+      const cards = [this.#dealer.askCard(), this.#dealer.askCard()];
+      cards.forEach((card) => this.currentPlayer.draw(card));
+      this.#removeGroup();
+      return cards.map((card) => card.id);
+    } catch (error) {
+      throw error;
+    }
   };
 }
 
@@ -284,4 +313,5 @@ module.exports = {
   Game,
   ActionError,
   WarCryError,
+  AbilityError,
 };

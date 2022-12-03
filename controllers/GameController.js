@@ -1,5 +1,5 @@
 const Mutex = require('async-mutex').Mutex;
-const { Game, ActionError } = require('../models/Game');
+const { Game, ActionError, AbilityError } = require('../models/Game');
 const GROUP = require('../models/Group');
 const { io } = require('../index');
 
@@ -11,6 +11,7 @@ const GAME_MSG = Object.freeze({
   CARD_PLAYED: 'card-played',
   WAR_CRY: 'war-cry',
   GROUP: 'group',
+  GROUP_FAILED: 'group-failed',
 });
 
 const PLAYER_MSG = Object.freeze({
@@ -299,6 +300,20 @@ class GameController {
     }
   };
 
+  onGroupFailed = async (client) => {
+    if (this.#isNotCurrentPlayer(client.uid)) return;
+
+    const release = await this.#mutex.acquire();
+    try {
+      this.#game.groupFailed();
+      this.#checkForActions();
+    } catch (error) {
+      client.emit('error', { message: error.message });
+    } finally {
+      release();
+    }
+  };
+
   onGroupNone = async (client) => {
     if (this.#isNotCurrentPlayer(client.uid)) return;
 
@@ -318,7 +333,32 @@ class GameController {
     }
   };
 
-  onEndGroup() {} //TODO
+  onGroupOracle = async (client) => {
+    if (this.#isNotCurrentPlayer(client.uid)) return;
+
+    const release = await this.#mutex.acquire();
+    if (this.#game.currentPlayerActions < 1) return;
+    try {
+      const cardIds = this.#game.groupOracle();
+      this.#whisperCardsAddedToHand(client, cardIds);
+      this.#announceCardsAddedToHand(cardIds.length);
+
+      if (this.#game.activeGroups.length > 0) {
+        this.#whisperGroup(this.#currentPlayerClient);
+      } else {
+        this.#checkForActions();
+      }
+    } catch (error) {
+      if (error instanceof AbilityError) {
+        this.#whisper(client, GAME_MSG.GROUP_FAILED, {});
+      } else {
+        this.#whisperGroup(this.#currentPlayerClient);
+      }
+      client.emit('error', { message: error.message });
+    } finally {
+      release();
+    }
+  };
 }
 
 module.exports = { GameController };

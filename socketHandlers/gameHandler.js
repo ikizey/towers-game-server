@@ -4,6 +4,7 @@ const GAME_EVENTS = Object.freeze({
   PLAY_CARD: 'play-card', // on player chooses card to play and target slot
   RESOLVE_CARD: 'resolve-card', //after card is played...
   RESOLVE_WAR_CRY: 'resolve-war-cry', //on EACH player, BUT CURRENT select card to discard
+  RESOLVE_GROUP_FAILED: 'resolve-group-failed',
   RESOLVE_GROUP_NONE: 'resolve-group-none',
   RESOLVE_GROUP_ENGINEER: 'resolve-group-engineer',
   RESOLVE_GROUP_ORACLE: 'resolve-group-oracle',
@@ -40,6 +41,11 @@ const gameHandler = (client) => {
     GAME_EVENTS.RESOLVE_WAR_CRY,
     async ({ cardIndices }) =>
       await client.gameController.onWarCryResolution(cardIndices, client)
+  );
+
+  client.on(
+    GAME_EVENTS.RESOLVE_GROUP_FAILED,
+    async () => await client.gameController.onGroupFailed(client)
   );
 
   client.on(
