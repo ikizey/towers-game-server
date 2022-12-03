@@ -17,9 +17,12 @@ class Hand extends Cards {
     const indices = cardIndices.map((index) => index);
     indices.sort((a, b) => a - b);
     indices.reverse();
+    const cards = [];
     indices.forEach((index) => {
-      this.cards.splice(index, 1);
+      cards.push(...this.cards.splice(index, 1));
     });
+
+    return cards;
   };
 }
 
