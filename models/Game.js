@@ -27,6 +27,7 @@ class Game {
   #currentPlayerIndex = -1;
   #playersAmount;
   #currentPlayerActions = 0;
+  #lastPlayedRace;
   //warCry
   activeWarCryRace = false;
   warCryDone;
@@ -60,6 +61,10 @@ class Game {
     this.#currentPlayerActions = this.gameRules.ActionsPerTurn;
   };
 
+  #resetLastPlayedRace = () => {
+    this.#lastPlayedRace = undefined;
+  };
+
   get currentPlayerActions() {
     return this.#currentPlayerActions;
   }
@@ -89,6 +94,7 @@ class Game {
   nextPlayer = () => {
     this.#currentPlayerIndex =
       (this.currentPlayerIndex + 1) % this.#playersAmount;
+    this.#resetLastPlayedRace();
     this.#resetActions();
     return this.#currentPlayerIndex;
   };
@@ -118,12 +124,21 @@ class Game {
       )
       .filter((index) => index !== null);
   }
+
+  get #currentPlayRaces() {
+    return this.#lastPlayedRace
+      ? [this.#lastPlayedRace]
+      : [RACE.ELF, RACE.ORC, RACE.HUMAN, RACE.UNDEAD];
+  }
+
   //* gameController logic spilled
   get currentPlayTargets() {
     const cards = this.currentPlayer.hand;
     const availableSlots = this.#usableSlotsIndices;
-
-    return cards.maps(
+    const allowedRaceCards = cards.filter((card) =>
+      this.#currentPlayRaces.includes(card.race)
+    );
+    return allowedRaceCards.map(
       (card) => availableSlots.map((slot) => card.slot === slot % 3) //reverse magic
     );
   }
@@ -139,10 +154,18 @@ class Game {
     }
   };
 
+  #setLastPlayedRace = (race) => {
+    this.#lastPlayedRace = race;
+  };
+
   //* gameController logic spilled
   build = (cardIndex, targetSlotIndex) => {
     if (!this.currentPlayTargets[cardIndex]?.includes(targetSlotIndex)) {
       throw new ActionError("You can't build this tower with this card!");
+    }
+    const cardRace = this.currentPlayer.cards[cardIndex].race;
+    if (!this.currentPlayRaces.includes(cardRace)) {
+      throw new ActionError('You can only play same race card!');
     }
 
     const cardId = this.currentPlayer.cards[cardIndex].id;
@@ -151,6 +174,7 @@ class Game {
     const buildResult = this.currentPlayer.towers.buildTower(card, towerIndex);
     const result = { ...buildResult, cardId };
     this.#setBuildResults(result);
+    this.#setLastPlayedRace(cardRace);
 
     this.#decreaseActions();
 
