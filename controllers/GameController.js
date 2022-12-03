@@ -7,6 +7,7 @@ const GAME_MSG = Object.freeze({
   NEW_TURN: 'new-turn',
   PLAYER_GOT_CARDS: 'player-got-cards',
   PLAYER_LOST_CARDS: 'player-lost-cards',
+  CARD_PLAYED: 'card-played',
 });
 
 const PLAYER_MSG = Object.freeze({
@@ -115,6 +116,7 @@ class GameController {
     if (this.#isNotCurrentPlayer(client.uid)) return;
 
     const release = await this.#mutex.acquire();
+    if (this.#game.currentPlayerActions < 1) return;
     try {
       const cardIds = [this.#game.playerDraw()];
       this.#whisper(client, PLAYER_MSG.CARDS_FROM_DECK, {
@@ -137,6 +139,7 @@ class GameController {
     if (this.#isNotCurrentPlayer(client.uid)) return;
 
     const release = await this.#mutex.acquire();
+    if (this.#game.currentPlayerActions < 1) return;
     try {
       const cardIds = game.playerSwapCards(...cardIndices);
       this.#announce(GAME_MSG.PLAYER_LOST_CARDS),
@@ -164,6 +167,7 @@ class GameController {
     if (this.#isNotCurrentPlayer(client.uid)) return;
 
     const release = await this.#mutex.acquire();
+    if (this.#game.currentPlayerActions < 1) return;
     try {
       const result = (playerPlay = (cardIndex, targetSlotIndex));
       if (result.isComplete) {
@@ -171,6 +175,14 @@ class GameController {
         this.#activeGroups = result.groups;
         this.#activeTowerIndex = result.index;
       }
+
+      this.#announce(GAME_MSG.CARD_PLAYED, {
+        playerIndex: this.game.currentPlayerIndex,
+        cardIndex,
+        targetSlotIndex,
+        cardId: result.cardId,
+      });
+
       //TODO send Fear(monoRace)
       //TODO send activeGroup in fear
       this.#checkForActions();

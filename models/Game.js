@@ -117,7 +117,8 @@ class Game {
     const cardId = this.currentPlayer.cards[cardIndex].id;
     const towerIndex = Math.floor(targetSlotIndex / 3);
     const card = this.currentPlayer.remove(cardId);
-    const result = this.currentPlayer.towers.buildTower(card, towerIndex);
+    const buildResult = this.currentPlayer.towers.buildTower(card, towerIndex);
+    const result = { ...buildResult, cardId };
 
     this.#decreaseActions();
 
