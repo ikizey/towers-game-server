@@ -270,6 +270,14 @@ class Game {
       this.warCryDone = undefined;
     }
   };
+
+  #removeAction = () => {
+    this.activeGroups.splice(0, 1);
+  };
+
+  groupNone = () => {
+    this.#removeAction();
+  };
 }
 
 module.exports = {

@@ -1,5 +1,6 @@
 const Mutex = require('async-mutex').Mutex;
 const { Game, ActionError } = require('../models/Game');
+const GROUP = require('../models/Group');
 const { io } = require('../index');
 
 const GAME_MSG = Object.freeze({
@@ -15,6 +16,13 @@ const GAME_MSG = Object.freeze({
 const PLAYER_MSG = Object.freeze({
   NEW_PHASE: 'new-phase',
   CARDS_FROM_DECK: 'cards-from-deck',
+  GROUP_NONE: 'group-none',
+  GROUP_ENGINEER: 'group-engineer',
+  GROUP_ORACLE: 'group-oracle',
+  GROUP_WORKER: 'group-worker',
+  GROUP_MAGE: 'group-mage',
+  GROUP_BOMBER: 'group-bomber',
+  GROUP_SABOTEUR: 'group-saboteur',
 });
 
 class GameController {
@@ -66,6 +74,10 @@ class GameController {
   #isNotCurrentPlayer = (clientUid) => {
     return !this.#isCurrentPlayer(clientUid);
   };
+
+  get #currentPlayerClient() {
+    return this.#clients[this.#game.currentPlayerIndex];
+  }
 
   #announceCardsAddedToHand = (amount, index) => {
     this.#announce(GAME_MSG.PLAYER_GOT_CARDS, {
@@ -206,8 +218,37 @@ class GameController {
     });
   };
 
-  #announceAbility = () => {
-    this.#announce(GAME_MSG.GROUP, {});
+  get #activeGroupSlot() {
+    const towerIndex = this.#game.activeTowerIndex;
+    const slot = this.#game.activeGroups.length - 1;
+    return towerIndex * 3 + slot;
+  }
+
+  get #activeGroup() {
+    return this.#game.activeGroups.slice(-1);
+  }
+
+  get #groupData() {
+    const source = this.#activeGroupSlot;
+    if (this.#activeGroup === GROUP.NONE) {
+      return { type: PLAYER_MSG.GROUP_NONE, data: { source } }; //+
+    } else if (this.#activeGroup === GROUP.ENGINEER) {
+      return { type: PLAYER_MSG.GROUP_ENGINEER, data: { source } }; //TODO! hard one
+    } else if (this.#activeGroup === GROUP.ORACLE) {
+      return { type: PLAYER_MSG.GROUP_ORACLE, data: { source } }; //+
+    } else if (this.#activeGroup === GROUP.WORKER) {
+      return { type: PLAYER_MSG.GROUP_WORKER, data: { source } }; //TODO!
+    } else if (this.#activeGroup === GROUP.MAGE) {
+      return { type: PLAYER_MSG.GROUP_MAGE, data: { source } }; //TODO!
+    } else if (this.#activeGroup === GROUP.BOMBER) {
+      return { type: PLAYER_MSG.GROUP_BOMBER, data: { source } }; //TODO!
+    } else if (this.#activeGroup === GROUP.SABOTEUR) {
+      return { type: PLAYER_MSG.GROUP_SABOTEUR, data: { source } }; //TODO!
+    }
+  }
+
+  #whisperGroup = (client) => {
+    this.#whisper(client, this.#groupData.type, this.#groupData.data);
   };
 
   onStartCardResolution = async (client) => {
@@ -218,7 +259,7 @@ class GameController {
       if (this.#game.activeWarCryRace) {
         this.#announceWarCry();
       } else if (this.#game.activeGroups.length > 0) {
-        this.#announceAbility();
+        this.#whisperGroup(this.#currentPlayerClient);
       } else {
         this.#checkForActions();
       }
@@ -248,10 +289,29 @@ class GameController {
       this.#announceCardsLeaveHand(playerIndex, ...cardIndices);
 
       if (!this.#game.activeWarCryRace) {
-        this.#announceAbility();
+        this.#whisperGroup(this.#currentPlayerClient);
       }
     } catch (error) {
       this.#whisperWarCry(client);
+      client.emit('error', { message: error.message });
+    } finally {
+      release();
+    }
+  };
+
+  onGroupNone = async (client) => {
+    if (this.#isNotCurrentPlayer(client.uid)) return;
+
+    const release = await this.#mutex.acquire();
+    try {
+      this.#game.groupNone();
+      if (this.#game.activeGroups.length > 0) {
+        this.#whisperGroup(this.#currentPlayerClient);
+      } else {
+        this.#checkForActions();
+      }
+    } catch (error) {
+      this.#whisperGroup(this.#currentPlayerClient);
       client.emit('error', { message: error.message });
     } finally {
       release();

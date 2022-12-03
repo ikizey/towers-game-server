@@ -4,7 +4,13 @@ const GAME_EVENTS = Object.freeze({
   PLAY_CARD: 'play-card', // on player chooses card to play and target slot
   RESOLVE_CARD: 'resolve-card', //after card is played...
   RESOLVE_WAR_CRY: 'resolve-war-cry', //on EACH player, BUT CURRENT select card to discard
-  RESOLVE_GROUP: 'resolve-group', //after effect of the group is played
+  RESOLVE_GROUP_NONE: 'resolve-group-none',
+  RESOLVE_GROUP_ENGINEER: 'resolve-group-engineer',
+  RESOLVE_GROUP_ORACLE: 'resolve-group-oracle',
+  RESOLVE_GROUP_WORKER: 'resolve-group-worker',
+  RESOLVE_GROUP_MAGE: 'resolve-group-mage',
+  RESOLVE_GROUP_BOMBER: 'resolve-group-bomber',
+  RESOLVE_GROUP_SABOTEUR: 'resolve-group-saboteur',
 });
 
 const gameHandler = (client) => {
@@ -34,6 +40,21 @@ const gameHandler = (client) => {
     GAME_EVENTS.RESOLVE_WAR_CRY,
     async ({ cardIndices }) =>
       await client.gameController.onWarCryResolution(cardIndices, client)
+  );
+
+  client.on(
+    GAME_EVENTS.RESOLVE_GROUP_NONE,
+    async () => await client.gameController.onGroupNone(client)
+  );
+
+  client.on(
+    GAME_EVENTS.RESOLVE_GROUP_ORACLE,
+    async () => await client.gameController.onGroupOracle(client)
+  );
+
+  client.on(
+    GAME_EVENTS.RESOLVE_GROUP_WORKER,
+    async () => await client.gameController.onGroupWorker(client)
   );
 };
 
