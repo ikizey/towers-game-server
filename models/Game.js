@@ -149,6 +149,15 @@ class Game {
     );
   }
 
+  //* gameController logic spilled
+  get workerPlayTargets() {
+    const cards = this.currentPlayer.hand;
+    const availableSlots = this.#usableSlotsIndices;
+    return cards.map(
+      (card) => availableSlots.map((slot) => card.slot === slot % 3) //reverse magic
+    );
+  }
+
   #setBuildResults = (result) => {
     if (result.isComplete) {
       this.activeWarCry = result.monoRace;
@@ -306,6 +315,22 @@ class Game {
     } catch (error) {
       throw error;
     }
+  };
+
+  groupWorker = (cardIndex, targetSlotIndex) => {
+    if (!this.workerPlayTargets[cardIndex]?.includes(targetSlotIndex)) {
+      throw new Error("You can't build this tower with this card!");
+    }
+
+    const cardId = this.currentPlayer.cards[cardIndex].id;
+    const towerIndex = Math.floor(targetSlotIndex / 3);
+    const card = this.currentPlayer.discardCards([cardIndex])[0];
+    const buildResult = this.currentPlayer.towers.buildTower(card, towerIndex);
+    this.#removeGroup();
+    const result = { ...buildResult, cardId };
+    this.#setBuildResults(result);
+
+    return result;
   };
 }
 

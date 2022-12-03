@@ -195,7 +195,6 @@ class GameController {
     if (this.#game.currentPlayerActions < 1) return;
     try {
       const result = this.#game.build(cardIndex, targetSlotIndex);
-      this.#setBuildResults(result);
       this.#announceBuilt(cardIndex, targetSlotIndex, result.cardId);
     } catch (error) {
       this.#beginAction();
@@ -238,7 +237,8 @@ class GameController {
     } else if (this.#activeGroup === GROUP.ORACLE) {
       return { type: PLAYER_MSG.GROUP_ORACLE, data: { source } }; //+
     } else if (this.#activeGroup === GROUP.WORKER) {
-      return { type: PLAYER_MSG.GROUP_WORKER, data: { source } }; //TODO!
+      const canPlay = this.#game.workerPlayTargets;
+      return { type: PLAYER_MSG.GROUP_WORKER, data: { source, canPlay } }; //+
     } else if (this.#activeGroup === GROUP.MAGE) {
       return { type: PLAYER_MSG.GROUP_MAGE, data: { source } }; //TODO!
     } else if (this.#activeGroup === GROUP.BOMBER) {
@@ -342,6 +342,32 @@ class GameController {
       const cardIds = this.#game.groupOracle();
       this.#whisperCardsAddedToHand(client, cardIds);
       this.#announceCardsAddedToHand(cardIds.length);
+
+      if (this.#game.activeGroups.length > 0) {
+        this.#whisperGroup(this.#currentPlayerClient);
+      } else {
+        this.#checkForActions();
+      }
+    } catch (error) {
+      if (error instanceof AbilityError) {
+        this.#whisper(client, GAME_MSG.GROUP_FAILED, {});
+      } else {
+        this.#whisperGroup(this.#currentPlayerClient);
+      }
+      client.emit('error', { message: error.message });
+    } finally {
+      release();
+    }
+  };
+
+  onGroupWorker = async (cardIndex, targetSlotIndex, client) => {
+    if (this.#isNotCurrentPlayer(client.uid)) return;
+
+    const release = await this.#mutex.acquire();
+    if (this.#game.currentPlayerActions < 1) return;
+    try {
+      const result = this.#game.groupWorker(cardIndex, targetSlotIndex);
+      this.#announceBuilt(cardIndex, targetSlotIndex, result.cardId);
 
       if (this.#game.activeGroups.length > 0) {
         this.#whisperGroup(this.#currentPlayerClient);

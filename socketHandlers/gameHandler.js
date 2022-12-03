@@ -60,7 +60,12 @@ const gameHandler = (client) => {
 
   client.on(
     GAME_EVENTS.RESOLVE_GROUP_WORKER,
-    async () => await client.gameController.onGroupWorker(client)
+    async ({ cardIndex, targetSlotIndex }) =>
+      await client.gameController.onGroupWorker(
+        cardIndex,
+        targetSlotIndex,
+        client
+      )
   );
 };
 
