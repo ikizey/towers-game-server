@@ -77,6 +77,16 @@ const gameHandler = (client) => {
         client
       )
   );
+
+  client.on(
+    GAME_EVENTS.RESOLVE_GROUP_MAGE,
+    async ({ targetPlayerIndex, targetSlotIndex }) =>
+      await client.gameController.onGroupMage(
+        targetPlayerIndex,
+        targetSlotIndex,
+        client
+      )
+  );
 };
 
 module.exports = { gameHandler };

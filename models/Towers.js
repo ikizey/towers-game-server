@@ -4,7 +4,7 @@ class Towers {
   #towers = [];
 
   constructor(towersNum) {
-    this.towers = [...new Array(towersNum)].map((_, index) => new Tower(index));
+    this.towers = [...new Array(towersNum)].map((_) => new Tower());
   }
 
   get towers() {

@@ -197,6 +197,14 @@ class GameController {
     });
   };
 
+  #checkForGroups = () => {
+    if (this.#game.activeGroups.length > 0) {
+      this.#whisperGroup(this.#currentPlayerClient);
+    } else {
+      this.#checkForActions();
+    }
+  };
+
   onBuild = async (cardIndex, targetSlotIndex, client) => {
     if (this.#isNotCurrentPlayer(client.uid)) return;
 
@@ -249,7 +257,13 @@ class GameController {
       const canPlay = this.#game.workerPlayTargets;
       return { type: PLAYER_MSG.GROUP_WORKER, data: { source, canPlay } }; //+
     } else if (this.#activeGroup === GROUP.MAGE) {
-      return { type: PLAYER_MSG.GROUP_MAGE, data: { source } }; //TODO!
+      const gameTargetSets = this.#game.MageTargets;
+      const enemyTargets = gameTargetSets.map((set) =>
+        set
+          .map((slot, index) => (slot !== null ? index + slot * 3 : null))
+          .filter((slot) => slot !== null)
+      );
+      return { type: PLAYER_MSG.GROUP_MAGE, data: { source, enemyTargets } }; //+
     } else if (this.#activeGroup === GROUP.BOMBER) {
       return { type: PLAYER_MSG.GROUP_BOMBER, data: { source } }; //TODO!
     } else if (this.#activeGroup === GROUP.SABOTEUR) {
@@ -257,7 +271,7 @@ class GameController {
       const targets = gameTargets
         .map((slot, index) => (slot !== null ? index + slot * 3 : null))
         .filter((slot) => slot !== null);
-      return { type: PLAYER_MSG.GROUP_SABOTEUR, data: { source }, targets }; //+
+      return { type: PLAYER_MSG.GROUP_SABOTEUR, data: { source, targets } }; //+
     }
   }
 
@@ -333,11 +347,8 @@ class GameController {
     const release = await this.#mutex.acquire();
     try {
       this.#game.groupNone();
-      if (this.#game.activeGroups.length > 0) {
-        this.#whisperGroup(this.#currentPlayerClient);
-      } else {
-        this.#checkForActions();
-      }
+
+      this.#checkForGroups();
     } catch (error) {
       this.#whisperGroup(this.#currentPlayerClient);
       client.emit('error', { message: error.message });
@@ -356,11 +367,7 @@ class GameController {
       this.#whisperCardsAddedToHand(client, cardIds);
       this.#announceCardsAddedToHand(cardIds.length, null);
 
-      if (this.#game.activeGroups.length > 0) {
-        this.#whisperGroup(this.#currentPlayerClient);
-      } else {
-        this.#checkForActions();
-      }
+      this.#checkForGroups();
     } catch (error) {
       if (error instanceof GroupError) {
         this.#whisper(client, GAME_MSG.GROUP_FAILED, {});
@@ -377,16 +384,11 @@ class GameController {
     if (this.#isNotCurrentPlayer(client.uid)) return;
 
     const release = await this.#mutex.acquire();
-    if (this.#game.currentPlayerActions < 1) return;
     try {
       const result = this.#game.groupWorker(cardIndex, targetSlotIndex);
       this.#announceBuilt(cardIndex, targetSlotIndex, result.cardId);
 
-      if (this.#game.activeGroups.length > 0) {
-        this.#whisperGroup(this.#currentPlayerClient);
-      } else {
-        this.#checkForActions();
-      }
+      this.#checkForGroups();
     } catch (error) {
       if (error instanceof GroupError) {
         this.#whisper(client, GAME_MSG.GROUP_FAILED, {});
@@ -411,11 +413,27 @@ class GameController {
       const card = this.#game.groupSaboteur(targetPlayerIndex, towerIndex);
       const cardId = card.id;
       this.#announceCardLeaveTower(targetPlayerIndex, targetSlotIndex, cardId);
-      if (this.#game.activeGroups.length > 0) {
-        this.#whisperGroup(this.#currentPlayerClient);
-      } else {
-        this.#checkForActions();
-      }
+
+      this.#checkForGroups();
+    } catch (error) {
+      this.#whisperGroup(this.#currentPlayerClient);
+      client.emit('error', { message: error.message });
+    } finally {
+      release();
+    }
+  };
+
+  onGroupMage = async (targetPlayerIndex, targetSlotIndex, client) => {
+    if (this.#isNotCurrentPlayer(client.uid)) return;
+    const release = await this.#mutex.acquire();
+    try {
+      const card = this.#game.groupMage(targetPlayerIndex, targetSlotIndex);
+      const cardIds = [card].map((card) => card.id);
+      this.#announceCardLeaveTower(targetPlayerIndex, targetSlotIndex, card.id);
+      this.#whisperCardsAddedToHand(client, cardIds);
+      this.#announceCardsAddedToHand(cardIds.length, null);
+
+      this.#checkForGroups();
     } catch (error) {
       this.#whisperGroup(this.#currentPlayerClient);
       client.emit('error', { message: error.message });

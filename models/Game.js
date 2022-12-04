@@ -351,6 +351,28 @@ class Game {
 
     return card;
   };
+
+  get MageTargets() {
+    return this.#players.map((_, index) =>
+      index === this.currentPlayerIndex
+        ? []
+        : this.towers.map((tower) =>
+            tower.currentSlot !== null ? tower.currentSlot : null
+          )
+    );
+  }
+
+  groupMage = (targetPlayerIndex, towerIndex) => {
+    if (targetPlayerIndex === this.currentPlayerIndex) {
+      throw new Error('Wrong target! You must choose an opponent tower.');
+    }
+
+    const card = this.#players[targetPlayerIndex].destroyTop(towerIndex);
+    this.currentPlayer.drawCard(card);
+    this.#removeGroup();
+
+    return card;
+  };
 }
 
 module.exports = {

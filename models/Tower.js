@@ -9,10 +9,6 @@ class TowerBuildError extends Error {
 class Tower {
   #slots = [null, null, null]; // BASE, MIDDLE, TOP
 
-  constructor(id) {
-    this.#id = id;
-  }
-
   get nextEmptySlot() {
     if (this.isComplete) return null;
 
@@ -20,19 +16,15 @@ class Tower {
   }
 
   get currentSlot() {
-    return this.nextEmptySlot === null
-      ? TOWER_SLOTS.TOP
-      : this.nextEmptySlot - 1;
+    if (this.isDestroyed) return null;
+    if (this.isComplete) return TOWER_SLOTS.TOP;
+    return this.nextEmptySlot - 1;
   }
 
   #cantBuild = (slots) => {
     const validSlots = slots.filter((slot) => slot === this.nextEmptySlot);
     return validSlots.length === 0;
   };
-
-  get id() {
-    return this.#id;
-  }
 
   get cards() {
     return this.#slots.filter((slot) => slot !== null).reverse();
@@ -81,22 +73,25 @@ class Tower {
     return { isComplete };
   };
 
+  get #cantDestroyTop() {
+    return this.currentSlot === null;
+  }
+
   destroyTop = () => {
-    const card = this.#slots[this.currentSlot];
-    this.#slots[this.currentSlot] = null;
-    return card;
+    //TODO! throw if cant destroy top
+    return this.cards.splice(this.currentSlot, 1, null);
   };
 
+  get #cantDestroy() {
+    return this.#cantDestroyTop || this.isComplete;
+  }
+
   destroy = () => {
+    //TODO! throw if cant destroy
     const cards = this.cards;
     this.#slots = [null, null, null];
     return cards;
   };
-
-  get state() {
-    //* {tower: this.id, slots: [bottom-card-id?, middle-card-id?, top-card-id?] }
-    return { tower: this.#id, slots: this.cards.map((card) => card.id) };
-  }
 }
 
 module.exports = { Tower, TowerBuildError };
