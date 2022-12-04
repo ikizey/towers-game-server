@@ -67,6 +67,16 @@ const gameHandler = (client) => {
         client
       )
   );
+
+  client.on(
+    GAME_EVENTS.RESOLVE_GROUP_SABOTEUR,
+    async ({ targetPlayerIndex, targetSlotIndex }) =>
+      await client.gameController.onGroupSaboteur(
+        targetPlayerIndex,
+        targetSlotIndex,
+        client
+      )
+  );
 };
 
 module.exports = { gameHandler };

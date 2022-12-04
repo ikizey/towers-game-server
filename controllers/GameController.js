@@ -1,5 +1,5 @@
 const Mutex = require('async-mutex').Mutex;
-const { Game, ActionError, AbilityError } = require('../models/Game');
+const { Game, ActionError, GroupError } = require('../models/Game');
 const GROUP = require('../models/Group');
 const { io } = require('../index');
 
@@ -12,6 +12,7 @@ const GAME_MSG = Object.freeze({
   WAR_CRY: 'war-cry',
   GROUP: 'group',
   GROUP_FAILED: 'group-failed',
+  CARD_LEAVE_TOWER: 'card-leave-tower',
 });
 
 const PLAYER_MSG = Object.freeze({
@@ -167,6 +168,7 @@ class GameController {
     try {
       const cardIds = this.#game.swapCards(...cardIndices);
       this.#announceCardsLeaveHand(...cardIndices);
+      // TODO! put cards to discard pile
       this.#whisperCardsAddedToHand(client, cardIds);
       this.#announceCardsAddedToHand(cardIds.length);
 
@@ -244,7 +246,11 @@ class GameController {
     } else if (this.#activeGroup === GROUP.BOMBER) {
       return { type: PLAYER_MSG.GROUP_BOMBER, data: { source } }; //TODO!
     } else if (this.#activeGroup === GROUP.SABOTEUR) {
-      return { type: PLAYER_MSG.GROUP_SABOTEUR, data: { source } }; //TODO!
+      const gameTargets = this.#game.saboteurTargets;
+      const targets = gameTargets
+        .map((slot, index) => (slot !== null ? index + slot * 3 : null))
+        .filter((slot) => slot !== null);
+      return { type: PLAYER_MSG.GROUP_SABOTEUR, data: { source }, targets }; //+
     }
   }
 
@@ -349,7 +355,7 @@ class GameController {
         this.#checkForActions();
       }
     } catch (error) {
-      if (error instanceof AbilityError) {
+      if (error instanceof GroupError) {
         this.#whisper(client, GAME_MSG.GROUP_FAILED, {});
       } else {
         this.#whisperGroup(this.#currentPlayerClient);
@@ -375,11 +381,36 @@ class GameController {
         this.#checkForActions();
       }
     } catch (error) {
-      if (error instanceof AbilityError) {
+      if (error instanceof GroupError) {
         this.#whisper(client, GAME_MSG.GROUP_FAILED, {});
       } else {
         this.#whisperGroup(this.#currentPlayerClient);
       }
+      client.emit('error', { message: error.message });
+    } finally {
+      release();
+    }
+  };
+
+  #announceCardLeaveTower = (playerIndex, slotIndex, cardId) => {
+    this.#announce('card-leave-tower', playerIndex, slotIndex, cardId);
+  };
+
+  onGroupSaboteur = async (targetPlayerIndex, targetSlotIndex, client) => {
+    if (this.#isNotCurrentPlayer(client.uid)) return;
+    const release = await this.#mutex.acquire();
+    try {
+      const towerIndex = Math.floor(targetSlotIndex / 3);
+      const card = this.#game.groupSaboteur(targetPlayerIndex, towerIndex);
+      const cardId = card.id;
+      this.#announceCardLeaveTower(targetPlayerIndex, targetSlotIndex, cardId);
+      if (this.#game.activeGroups.length > 0) {
+        this.#whisperGroup(this.#currentPlayerClient);
+      } else {
+        this.#checkForActions();
+      }
+    } catch (error) {
+      this.#whisperGroup(this.#currentPlayerClient);
       client.emit('error', { message: error.message });
     } finally {
       release();

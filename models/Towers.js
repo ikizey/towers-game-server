@@ -28,6 +28,10 @@ class Towers {
   buildTower = (card, towerIndex) => {
     return this.#towers[towerIndex].build(card);
   };
+
+  destroyTop = (towerIndex) => {
+    return this.#towers[towerIndex].destroyTop();
+  };
 }
 
 module.exports = { Towers };

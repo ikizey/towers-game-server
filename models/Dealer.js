@@ -34,8 +34,8 @@ class Dealer {
     return card;
   };
 
-  askBury = (card) => {
-    this.#graveYard.add(card);
+  askBury = (...cards) => {
+    this.#graveYard.add(...cards);
   };
 
   askShowDead = () => {

@@ -14,7 +14,7 @@ class WarCryError extends Error {
   }
 }
 
-class AbilityError extends Error {
+class GroupError extends Error {
   constructor(message) {
     super(message);
   }
@@ -217,7 +217,7 @@ class Game {
     }
 
     this.currentPlayer.discardCards(...cardIndices);
-
+    // TODO! put cards to discard pile
     let gotCardsIds = [];
     for (let amount = gainAmount; amount > 0; amount -= 1) {
       const card = this.#dealer.askCard();
@@ -304,7 +304,7 @@ class Game {
 
   groupOracle = () => {
     if (this.#dealer.CardsTotal < 2) {
-      throw new AbilityError('Not enough cards for group.');
+      throw new GroupError('Not enough cards for group.');
     }
 
     try {
@@ -332,11 +332,29 @@ class Game {
 
     return result;
   };
+
+  get saboteurTargets() {
+    return this.currentPlayer.towers.map((tower) =>
+      tower.currentSlot !== null ? tower.currentSlot : null
+    );
+  }
+
+  groupSaboteur = (targetPlayerIndex, towerIndex) => {
+    if (targetPlayerIndex !== this.#currentPlayerIndex) {
+      throw new Error('Wrong target! You must choose your own tower.');
+    }
+
+    const card = this.currentPlayer.towers.destroyTop(towerIndex);
+    this.#dealer.askBury(card);
+    this.#removeGroup();
+
+    return card;
+  };
 }
 
 module.exports = {
   Game,
   ActionError,
   WarCryError,
-  AbilityError,
+  GroupError,
 };

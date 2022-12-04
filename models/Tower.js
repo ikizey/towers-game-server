@@ -19,7 +19,7 @@ class Tower {
     return this.#slots.findIndex((slot) => slot === null);
   }
 
-  get #currentSlot() {
+  get currentSlot() {
     return this.nextEmptySlot === null
       ? TOWER_SLOTS.TOP
       : this.nextEmptySlot - 1;
@@ -82,8 +82,8 @@ class Tower {
   };
 
   destroyTop = () => {
-    const card = this.#slots[this.#currentSlot];
-    this.#slots[this.#currentSlot] = null;
+    const card = this.#slots[this.currentSlot];
+    this.#slots[this.currentSlot] = null;
     return card;
   };
 

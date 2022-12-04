@@ -5,10 +5,10 @@ class Discard extends Cards {
     return this.cards.length === 0;
   }
 
-  show = () => this.cards.map((card) => ({ ...card }));
+  show = () => this.cards.map((card) => ({ ...card })).reverse();
 
-  add = (card) => {
-    this.cards.push(card);
+  add = (...cards) => {
+    this.cards.splice(cards.length, 0, ...cards);
   };
 
   removeAll = () => {
