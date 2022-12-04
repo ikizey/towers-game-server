@@ -216,18 +216,19 @@ class Game {
       throw new ActionError('Not Enough cards in the deck. Choose less cards.');
     }
 
-    this.currentPlayer.discardCards(...cardIndices);
-    // TODO! put cards to discard pile
-    let gotCardsIds = [];
-    for (let amount = gainAmount; amount > 0; amount -= 1) {
-      const card = this.#dealer.askCard();
-      gotCardsIds.push(card);
+    const discardedCards = this.currentPlayer.discardCards(...cardIndices);
+    this.#dealer.askBury(...discardedCards);
+
+    const newCards = [...new Array(gainAmount)].map((_) =>
+      this.#dealer.askCard()
+    );
+    newCards.forEach((card) => {
       this.currentPlayer.drawCard(card);
-    }
+    });
 
     this.#decreaseActions();
 
-    return gotCardsIds;
+    return { newCards, discardedCards };
   };
 
   #checkWrongCards = (discardAmount, cardRacesToDiscard) => {

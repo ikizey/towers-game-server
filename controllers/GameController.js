@@ -8,6 +8,7 @@ const GAME_MSG = Object.freeze({
   NEW_TURN: 'new-turn',
   PLAYER_GOT_CARDS: 'player-got-cards',
   PLAYER_LOST_CARDS: 'player-lost-cards',
+  CARDS_DISCARDED: 'cards-discarded',
   CARD_PLAYED: 'card-played',
   WAR_CRY: 'war-cry',
   GROUP: 'group',
@@ -141,7 +142,7 @@ class GameController {
     try {
       const cardIds = [this.#game.playerDraw()];
       this.#whisperCardsAddedToHand(client, cardIds);
-      this.#announceCardsAddedToHand(cardIds.length);
+      this.#announceCardsAddedToHand(cardIds.length, null);
 
       this.#checkForActions();
     } catch (error) {
@@ -160,17 +161,23 @@ class GameController {
       };
   };
 
+  #announceCardsAddedToDiscard = (...discardedCardsIds) => {
+    this.#announce(GAME_MSG.CARDS_DISCARDED, { cardIds: discardedCardsIds });
+  };
+
   onSwapCards = async (cardIndices, client) => {
     if (this.#isNotCurrentPlayer(client.uid)) return;
 
     const release = await this.#mutex.acquire();
     if (this.#game.currentPlayerActions < 1) return;
     try {
-      const cardIds = this.#game.swapCards(...cardIndices);
-      this.#announceCardsLeaveHand(...cardIndices);
-      // TODO! put cards to discard pile
-      this.#whisperCardsAddedToHand(client, cardIds);
-      this.#announceCardsAddedToHand(cardIds.length);
+      const { newCards, discardedCards } = this.#game.swapCards(...cardIndices);
+      const newCardIds = newCards.map((card) => card.id);
+      const discardedCardsIds = discardedCards.map((card) => card.id);
+      this.#announceCardsLeaveHand(null, ...cardIndices);
+      this.#announceCardsAddedToDiscard(...discardedCardsIds);
+      this.#whisperCardsAddedToHand(client, newCardIds);
+      this.#announceCardsAddedToHand(newCardIds.length, null);
 
       this.#checkForActions();
     } catch (error) {
@@ -347,7 +354,7 @@ class GameController {
     try {
       const cardIds = this.#game.groupOracle();
       this.#whisperCardsAddedToHand(client, cardIds);
-      this.#announceCardsAddedToHand(cardIds.length);
+      this.#announceCardsAddedToHand(cardIds.length, null);
 
       if (this.#game.activeGroups.length > 0) {
         this.#whisperGroup(this.#currentPlayerClient);
