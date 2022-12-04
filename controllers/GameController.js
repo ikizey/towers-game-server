@@ -265,7 +265,8 @@ class GameController {
       );
       return { type: PLAYER_MSG.GROUP_MAGE, data: { source, enemyTargets } }; //+
     } else if (this.#activeGroup === GROUP.BOMBER) {
-      return { type: PLAYER_MSG.GROUP_BOMBER, data: { source } }; //TODO!
+      const enemyTargets = this.#game.bomberTargets;
+      return { type: PLAYER_MSG.GROUP_BOMBER, data: { source, enemyTargets } }; //+
     } else if (this.#activeGroup === GROUP.SABOTEUR) {
       const gameTargets = this.#game.saboteurTargets;
       const targets = gameTargets
@@ -402,7 +403,7 @@ class GameController {
   };
 
   #announceCardLeaveTower = (playerIndex, slotIndex, cardId) => {
-    this.#announce('card-leave-tower', playerIndex, slotIndex, cardId);
+    this.#announce(GAME_MSG.CARD_LEAVE_TOWER, playerIndex, slotIndex, cardId);
   };
 
   onGroupSaboteur = async (targetPlayerIndex, targetSlotIndex, client) => {
@@ -432,6 +433,27 @@ class GameController {
       this.#announceCardLeaveTower(targetPlayerIndex, targetSlotIndex, card.id);
       this.#whisperCardsAddedToHand(client, cardIds);
       this.#announceCardsAddedToHand(cardIds.length, null);
+
+      this.#checkForGroups();
+    } catch (error) {
+      this.#whisperGroup(this.#currentPlayerClient);
+      client.emit('error', { message: error.message });
+    } finally {
+      release();
+    }
+  };
+
+  onGroupBomber = async (targetPlayerIndex, targetTowerIndex, client) => {
+    if (this.#isNotCurrentPlayer(client.uid)) return;
+    const release = await this.#mutex.acquire();
+    try {
+      const cards = this.#game.groupBomber(targetPlayerIndex, targetTowerIndex);
+      const cardIds = cards.map((card) => card.id);
+      cardIds.forEach((cardId, index) => {
+        const cardSlotIndex = cardIds.length - 1 - index;
+        this.#announceCardLeaveTower(targetPlayerIndex, cardSlotIndex, cardId);
+      });
+      this.#announceCardsAddedToDiscard(...cardIds);
 
       this.#checkForGroups();
     } catch (error) {

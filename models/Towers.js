@@ -32,6 +32,10 @@ class Towers {
   destroyTop = (towerIndex) => {
     return this.#towers[towerIndex].destroyTop();
   };
+
+  destroy = (towerIndex) => {
+    return this.#towers[towerIndex].destroy();
+  };
 }
 
 module.exports = { Towers };

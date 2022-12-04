@@ -87,6 +87,16 @@ const gameHandler = (client) => {
         client
       )
   );
+
+  client.on(
+    GAME_EVENTS.RESOLVE_GROUP_BOMBER,
+    async ({ targetPlayerIndex, targetTowerIndex }) =>
+      await client.gameController.onGroupBomber(
+        targetPlayerIndex,
+        targetTowerIndex,
+        client
+      )
+  );
 };
 
 module.exports = { gameHandler };

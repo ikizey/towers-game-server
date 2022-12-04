@@ -335,9 +335,7 @@ class Game {
   };
 
   get saboteurTargets() {
-    return this.currentPlayer.towers.map((tower) =>
-      tower.currentSlot !== null ? tower.currentSlot : null
-    );
+    return this.currentPlayer.towers.map((tower) => tower.currentSlot);
   }
 
   groupSaboteur = (targetPlayerIndex, towerIndex) => {
@@ -353,12 +351,10 @@ class Game {
   };
 
   get MageTargets() {
-    return this.#players.map((_, index) =>
+    return this.#players.towers.map((_, index) =>
       index === this.currentPlayerIndex
         ? []
-        : this.towers.map((tower) =>
-            tower.currentSlot !== null ? tower.currentSlot : null
-          )
+        : this.towers.map((tower) => tower.currentSlot)
     );
   }
 
@@ -367,11 +363,33 @@ class Game {
       throw new Error('Wrong target! You must choose an opponent tower.');
     }
 
-    const card = this.#players[targetPlayerIndex].destroyTop(towerIndex);
+    const card = this.#players[targetPlayerIndex].towers.destroyTop(towerIndex);
     this.currentPlayer.drawCard(card);
     this.#removeGroup();
 
     return card;
+  };
+
+  get bomberTargets() {
+    return this.#players.map((player, index) =>
+      index === this.playerIndex
+        ? []
+        : player.towers
+            .map((tower, index) => (tower.isComplete ? null : index))
+            .filter((towerIndex) => towerIndex !== null)
+    );
+  }
+
+  groupBomber = (targetPlayerIndex, towerIndex) => {
+    if (targetPlayerIndex === this.currentPlayerIndex) {
+      throw new Error('Wrong target! You must choose an opponent tower.');
+    }
+
+    const cards = this.#players[targetPlayerIndex].towers.destroy(towerIndex);
+    this.#dealer.askBury(cards);
+    this.#removeGroup();
+
+    return cards;
   };
 }
 
