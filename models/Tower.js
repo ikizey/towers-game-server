@@ -7,12 +7,15 @@ class TowerBuildError extends Error {
 }
 
 class Tower {
-  #slots = [null, null, null]; // BASE, MIDDLE, TOP
+  #slots = [...Tower.#defaultSlots]; // BASE, MIDDLE, TOP
+
+  static #emptySlot = null;
+  static #defaultSlots = [Tower.#emptySlot, Tower.#emptySlot, Tower.#emptySlot];
 
   get nextEmptySlot() {
     if (this.isComplete) return null;
 
-    return this.#slots.findIndex((slot) => slot === null);
+    return this.#slots.findIndex((slot) => slot === Tower.#emptySlot);
   }
 
   get currentSlot() {
@@ -27,11 +30,11 @@ class Tower {
   };
 
   get cards() {
-    return this.#slots.filter((slot) => slot !== null).reverse();
+    return this.#slots.filter((slot) => slot !== Tower.#emptySlot).reverse();
   }
 
   get isComplete() {
-    return this.#slots[TOWER_SLOTS.TOP] !== null;
+    return this.#slots[TOWER_SLOTS.TOP] !== Tower.#emptySlot;
   }
 
   get isIncomplete() {
@@ -54,7 +57,7 @@ class Tower {
   }
 
   get isDestroyed() {
-    return this.#slots[TOWER_SLOTS.BASE] === null;
+    return this.#slots[TOWER_SLOTS.BASE] === Tower.#emptySlot;
   }
 
   build = (card) => {
@@ -74,7 +77,7 @@ class Tower {
   };
 
   get #cantDestroyTop() {
-    return this.currentSlot === null;
+    return this.currentSlot === Tower.#emptySlot;
   }
 
   destroyTop = () => {
@@ -88,9 +91,12 @@ class Tower {
 
   destroy = () => {
     //TODO! throw if cant destroy
-    const cards = this.cards;
-    this.#slots = [null, null, null];
-    return cards;
+
+    return this.cards.splice(
+      this.currentSlot,
+      Infinity,
+      ...Tower.#defaultSlots
+    );
   };
 }
 
