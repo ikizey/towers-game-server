@@ -20,6 +20,27 @@ class Dealer {
     return this.#deck.isEmpty && this.#graveYard.isEmpty;
   }
 
+  #restockDeck = () => {
+    if (this.#graveYard.isEmpty) {
+      throw new Error('Dealer: no more cards in the Game');
+    }
+    const cards = this.#graveYard.removeAll();
+    this.#deck.cards = cards;
+  };
+
+  askCards = (amount) => {
+    let cards = [];
+    while (amount > 0) {
+      const card = this.#deck.getTopCard();
+      if (this.#deck.isEmpty) {
+        this.#restockDeck();
+      }
+      cards.push(card);
+      amount -= 1;
+    }
+    return cards;
+  };
+
   askCard = () => {
     if (this.#deck.isEmpty) {
       if (this.#graveYard.isEmpty) {
