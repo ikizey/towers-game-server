@@ -9,6 +9,10 @@ class Hand extends Cards {
     return this.cards.map((card) => card);
   }
 
+  get size() {
+    return this.cards.length;
+  }
+
   addCard(card) {
     this.cards.push(card);
   }

@@ -1,6 +1,7 @@
 const { Dealer } = require('./Dealer');
 const { Player } = require('../models/Player');
 const { shuffle } = require('../globals');
+const { Hand } = require('./Hand');
 
 class ActionError extends Error {
   constructor(message) {
@@ -33,12 +34,23 @@ class Game {
   #currentPlayerIndex = -1;
   #playersAmount;
   #currentPlayerActions = 0;
-  #lastPlayedRace;
+  #gameLastStage; //Action, Group, Worker, Engineer
+  #lastRace;
   //warCry
   activeWarCryRace = false;
   warCryDone;
-  //
+  //groups
   activeGroups;
+  //completed Tower
+  activeTowerIndex;
+
+  //ENGINEER GROUP
+  #engineerHand = new Hand();
+  //engWarCry
+  engActiveWarCryRace = false;
+  engWarCryDone;
+  //engGroups
+  engActiveGroups;
   //completed Tower
   activeTowerIndex;
 
@@ -68,7 +80,7 @@ class Game {
   };
 
   #resetLastPlayedRace = () => {
-    this.#lastPlayedRace = undefined;
+    this.#lastRace = undefined;
   };
 
   get currentPlayerActions() {
@@ -120,37 +132,39 @@ class Game {
       throw error;
     }
   };
-  //* gameController logic spilled
+
   get #usableSlotsIndices() {
+    //* gameController logic spilled
     return this.currentPlayer.towers
       .map((tower, index) =>
         tower.nextEmptySlot !== null
-          ? tower.nextEmptySlot + index + index * 2 // magic
+          ? tower.nextEmptySlot + index * 3 // magic
           : null
       )
       .filter((index) => index !== null);
   }
 
   get #currentPlayRaces() {
-    return this.#lastPlayedRace
-      ? [this.#lastPlayedRace]
+    return this.#lastRace
+      ? [this.#lastRace]
       : [RACE.ELF, RACE.ORC, RACE.HUMAN, RACE.UNDEAD];
   }
 
-  //* gameController logic spilled
   get currentPlayTargets() {
+    //TODO!! INCORRECT
+    //* gameController logic spilled
     const cards = this.currentPlayer.hand;
     const availableSlots = this.#usableSlotsIndices;
-    const allowedRaceCards = cards.filter((card) =>
-      this.#currentPlayRaces.includes(card.race)
-    );
-    return allowedRaceCards.map(
-      (card) => availableSlots.map((slot) => card.slot === slot % 3) //reverse magic
-    );
+    return cards
+      .filter((card) => this.#currentPlayRaces.includes(card.race))
+      .map(
+        (card) => availableSlots.map((slot) => card.slot === slot % 3) //reverse magic
+      );
   }
 
-  //* gameController logic spilled
   get workerPlayTargets() {
+    //TODO!! INCORRECT
+    //* gameController logic spilled
     const cards = this.currentPlayer.hand;
     const availableSlots = this.#usableSlotsIndices;
     return cards.map(
@@ -170,11 +184,12 @@ class Game {
   };
 
   #setLastPlayedRace = (race) => {
-    this.#lastPlayedRace = race;
+    if (this.#lastRace) return;
+    this.#lastRace = race;
   };
 
-  //* gameController logic spilled
   build = (cardIndex, targetSlotIndex) => {
+    //* gameController logic spilled
     if (!this.currentPlayTargets[cardIndex]?.includes(targetSlotIndex)) {
       throw new ActionError("You can't build this tower with this card!");
     }
@@ -390,6 +405,93 @@ class Game {
     this.#removeGroup();
 
     return cards;
+  };
+
+  get isEngineerActive() {
+    return this.#engineerHand.size > 0;
+  }
+
+  get #activeHandCards() {
+    return this.isEngineerActive
+      ? this.#engineerHand.cards
+      : this.currentPlayer.hand.cards;
+  }
+
+  // get freePlayTargets() {
+  //   const cards = this.#activeHandCards;
+  //   const nextSlots = this.currentPlayer.towers.nextSlots;
+
+  //   return cards.map((card) =>
+  //     nextSlots.map((slot) =>
+  //       card.slots.reduce(
+  //         (prev, cur) => (prev ? prev : cur === slot ? cur : prev),
+  //         null
+  //       )
+  //     )
+  //   );
+  // }
+
+  get playTargets() {
+    const cards = this.#activeHandCards;
+    const nextSlots = this.currentPlayer.towers.nextSlots;
+
+    return cards.map((card) =>
+      card.race === lastRace
+        ? nextSlots.map((slot) =>
+            card.slots.reduce(
+              (prev, cur) => (prev ? prev : cur === slot ? cur : prev),
+              null
+            )
+          )
+        : []
+    );
+  }
+
+  groupEngineerDraw = () => {
+    try {
+      const cards = [this.#dealer.askCard(), this.#dealer.askCard()];
+      cards.forEach((card) => {
+        this.#engineerHand.draw(card);
+      });
+
+      return cards;
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  #setEngBuildResults = (result) => {
+    if (result.isComplete) {
+      this.engActiveWarCry = result.monoRace;
+      this.engActiveGroups = result.groups;
+      this.engActiveTowerIndex = result.index;
+      if (result.monoRace) {
+        this.engWarCryDone = this.#players.map((_) => 0);
+      }
+    }
+  };
+
+  #takeCardFromActiveHand = (...cardIndices) => {
+    return this.isEngineerActive
+      ? this.#engineerHand.remove(...cardIndices)
+      : this.currentPlayer.discardCards(cardIndices);
+  };
+
+  groupEngineerPlay = (cardIndex, towerIndex) => {
+    if (!this.PlayTargets[cardIndex]?.includes(towerIndex)) {
+      throw new Error("You can't build this tower with this card!");
+    }
+    const cardRace = activeHandCards[cardIndex].race;
+    if (!this.#lastRace === cardRace) {
+      throw new Error('You can only play same race card!');
+    }
+
+    const card = this.#takeCardFromActiveHand([cardIndex])[0];
+    const buildResult = this.currentPlayer.towers.buildTower(card, towerIndex);
+    const result = { ...buildResult, discardCard: card };
+    this.#setEngBuildResults(result);
+
+    return result;
   };
 }
 

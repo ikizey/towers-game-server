@@ -6,9 +6,11 @@ const GAME_EVENTS = Object.freeze({
   RESOLVE_WAR_CRY: 'resolve-war-cry', //on EACH player, BUT CURRENT select card to discard
   RESOLVE_GROUP_FAILED: 'resolve-group-failed',
   RESOLVE_GROUP_NONE: 'resolve-group-none',
-  RESOLVE_GROUP_ENGINEER: 'resolve-group-engineer',
+  RESOLVE_GROUP_ENGINEER_DRAW: 'resolve-group-engineer-draw',
+  RESOLVE_GROUP_ENGINEER_RESOLVE: 'resolve-group-engineer-resolve',
   RESOLVE_GROUP_ORACLE: 'resolve-group-oracle',
   RESOLVE_GROUP_WORKER: 'resolve-group-worker',
+  CANT_PLAY_CARD: 'cant-play-any-card',
   RESOLVE_GROUP_MAGE: 'resolve-group-mage',
   RESOLVE_GROUP_BOMBER: 'resolve-group-bomber',
   RESOLVE_GROUP_SABOTEUR: 'resolve-group-saboteur',
@@ -38,6 +40,11 @@ const gameHandler = (client) => {
   );
 
   client.on(
+    GAME_EVENTS.CANT_PLAY_CARD,
+    async () => await client.gameController.onCantPlayCard(client)
+  );
+
+  client.on(
     GAME_EVENTS.RESOLVE_WAR_CRY,
     async ({ cardIndices }) =>
       await client.gameController.onWarCryResolution(cardIndices, client)
@@ -54,6 +61,11 @@ const gameHandler = (client) => {
   );
 
   client.on(
+    GAME_EVENTS.RESOLVE_GROUP_ENGINEER_DRAW,
+    async () => await client.gameController.onGroupEngineerDraw(client)
+  );
+
+  client.on(
     GAME_EVENTS.RESOLVE_GROUP_ORACLE,
     async () => await client.gameController.onGroupOracle(client)
   );
@@ -63,16 +75,6 @@ const gameHandler = (client) => {
     async ({ cardIndex, targetSlotIndex }) =>
       await client.gameController.onGroupWorker(
         cardIndex,
-        targetSlotIndex,
-        client
-      )
-  );
-
-  client.on(
-    GAME_EVENTS.RESOLVE_GROUP_SABOTEUR,
-    async ({ targetPlayerIndex, targetSlotIndex }) =>
-      await client.gameController.onGroupSaboteur(
-        targetPlayerIndex,
         targetSlotIndex,
         client
       )
@@ -94,6 +96,16 @@ const gameHandler = (client) => {
       await client.gameController.onGroupBomber(
         targetPlayerIndex,
         targetTowerIndex,
+        client
+      )
+  );
+
+  client.on(
+    GAME_EVENTS.RESOLVE_GROUP_SABOTEUR,
+    async ({ targetPlayerIndex, targetSlotIndex }) =>
+      await client.gameController.onGroupSaboteur(
+        targetPlayerIndex,
+        targetSlotIndex,
         client
       )
   );

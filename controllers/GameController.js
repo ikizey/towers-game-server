@@ -14,6 +14,7 @@ const GAME_MSG = Object.freeze({
   GROUP: 'group',
   GROUP_FAILED: 'group-failed',
   CARD_LEAVE_TOWER: 'card-leave-tower',
+  PLAYER_GOT_ENG_CARDS: 'eng-got-cards',
 });
 
 const PLAYER_MSG = Object.freeze({
@@ -248,14 +249,14 @@ class GameController {
   get #groupData() {
     const source = this.#activeGroupSlot;
     if (this.#activeGroup === GROUP.NONE) {
-      return { type: PLAYER_MSG.GROUP_NONE, data: { source } }; //+
+      return { type: PLAYER_MSG.GROUP_NONE, data: { source } };
     } else if (this.#activeGroup === GROUP.ENGINEER) {
-      return { type: PLAYER_MSG.GROUP_ENGINEER, data: { source } }; //TODO! hard one
+      return { type: PLAYER_MSG.GROUP_ENGINEER, data: { source } };
     } else if (this.#activeGroup === GROUP.ORACLE) {
-      return { type: PLAYER_MSG.GROUP_ORACLE, data: { source } }; //+
+      return { type: PLAYER_MSG.GROUP_ORACLE, data: { source } };
     } else if (this.#activeGroup === GROUP.WORKER) {
       const canPlay = this.#game.workerPlayTargets;
-      return { type: PLAYER_MSG.GROUP_WORKER, data: { source, canPlay } }; //+
+      return { type: PLAYER_MSG.GROUP_WORKER, data: { source, canPlay } };
     } else if (this.#activeGroup === GROUP.MAGE) {
       const gameTargetSets = this.#game.MageTargets;
       const enemyTargets = gameTargetSets.map((set) =>
@@ -263,16 +264,16 @@ class GameController {
           .map((slot, index) => (slot !== null ? index + slot * 3 : null))
           .filter((slot) => slot !== null)
       );
-      return { type: PLAYER_MSG.GROUP_MAGE, data: { source, enemyTargets } }; //+
+      return { type: PLAYER_MSG.GROUP_MAGE, data: { source, enemyTargets } };
     } else if (this.#activeGroup === GROUP.BOMBER) {
       const enemyTargets = this.#game.bomberTargets;
-      return { type: PLAYER_MSG.GROUP_BOMBER, data: { source, enemyTargets } }; //+
+      return { type: PLAYER_MSG.GROUP_BOMBER, data: { source, enemyTargets } };
     } else if (this.#activeGroup === GROUP.SABOTEUR) {
       const gameTargets = this.#game.saboteurTargets;
       const targets = gameTargets
         .map((slot, index) => (slot !== null ? index + slot * 3 : null))
         .filter((slot) => slot !== null);
-      return { type: PLAYER_MSG.GROUP_SABOTEUR, data: { source, targets } }; //+
+      return { type: PLAYER_MSG.GROUP_SABOTEUR, data: { source, targets } };
     }
   }
 
@@ -458,6 +459,63 @@ class GameController {
       this.#checkForGroups();
     } catch (error) {
       this.#whisperGroup(this.#currentPlayerClient);
+      client.emit('error', { message: error.message });
+    } finally {
+      release();
+    }
+  };
+
+  #announceCardsAddedToEngHand = (amount, index) => {
+    this.#announce(GAME_MSG.PLAYER_GOT_ENG_CARDS, {
+      playerIndex: index || this.#game.currentPlayer.index,
+      amount: amount,
+    });
+  };
+
+  #whisperEngineerCanPlay = (client) => {
+    const gameTargets = this.#game.PlayTargets;
+    const canPlay = gameTargets.map((card) =>
+      card?.map((tower, slot) => tower + slot * 3).filter((slot) => !!slot)
+    );
+    this.#whisper(client, 'engineer-can-play', canPlay);
+  };
+
+  onGroupEngineerDraw = async (client) => {
+    if (this.#isNotCurrentPlayer(client.uid)) return;
+
+    const release = await this.#mutex.acquire();
+    //if
+    try {
+      const cards = this.#game.GroupEngineerDraw();
+      const cardIds = cards.map((card) => card.id);
+
+      this.#announceCardsAddedToEngHand(cardIds, null);
+      this.#whisperEngineerCanPlay(client);
+    } catch (error) {
+      this.#whisperGroup(this.#currentPlayerClient);
+      client.emit('error', { message: error.message });
+    } finally {
+      release();
+    }
+  };
+
+  onGroupEngineerPlay = async (client, cardIndex, targetSlotIndex) => {
+    if (this.#isNotCurrentPlayer(client.uid)) return;
+
+    const release = await this.#mutex.acquire();
+    try {
+      const towerIndex = Math.floor(targetSlotIndex / 3);
+      const result = groupEngineerPlay(cardIndex, towerIndex);
+      this.#announceBuilt(cardIndex, targetSlotIndex, result.cardId);
+      if (this.#game.isEngineerActive) {
+        this.#whisperEngineerCanPlay(client);
+      } else if (1 === 1) {
+        ///TODO! check if new tower is built
+      }
+
+      // this.#checkForGroups();
+    } catch (error) {
+      // if can't play anything
       client.emit('error', { message: error.message });
     } finally {
       release();

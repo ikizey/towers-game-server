@@ -20,6 +20,14 @@ class Towers {
     return nonNullSlots;
   }
 
+  get nextSlots() {
+    return this.#towers.map((tower) => tower.nextEmptySlot);
+  }
+
+  get availSlots() {
+    return [...new Set(this.nextSlots)].filter((slot) => slot !== null);
+  }
+
   getTower = (id) => {
     const index = this.#towers.findIndex((tower) => tower.id === id);
     return this.#towers[index];
