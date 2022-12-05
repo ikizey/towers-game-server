@@ -26,7 +26,11 @@ class Player {
   }
 
   drawCard = (card) => {
-    this.#hand.add(card);
+    this.#hand.addCard(card);
+  };
+
+  drawCards = (...cards) => {
+    this.#hand.addCards(...cards);
   };
 
   discardCards = (...cardIndices) => {
