@@ -32,7 +32,6 @@ class Game {
   #dealer = new Dealer();
   #players = [];
   #currentPlayerIndex = -1;
-  #playersAmount;
   #currentPlayerActions = 0;
   #gameLastStage; //Action, Group, Worker, Engineer
   #lastRace;
@@ -59,7 +58,6 @@ class Game {
       (client) => new Player(client.uid, client.name, this.gameRules.MaxTowers)
     );
 
-    this.#playersAmount = players.length;
     shuffle(players);
     this.players = players;
   }
@@ -69,6 +67,10 @@ class Game {
       id: player.id,
       name: player.name,
     }));
+  }
+
+  get #playersAmount() {
+    return this.#players.length;
   }
 
   #decreaseActions = () => {
