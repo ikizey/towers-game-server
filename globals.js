@@ -8,4 +8,14 @@ const shuffle = (array) => {
   }
 };
 
-module.exports = { totalPlayers, shuffle };
+function* range(start, stop, step = 1) {
+  if (stop == null) {
+    stop = start;
+    start = 0;
+  }
+  for (let i = start; step > 0 ? i < stop : i > stop; i += step) {
+    yield i;
+  }
+}
+
+module.exports = { totalPlayers, shuffle, range };
