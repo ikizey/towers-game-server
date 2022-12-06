@@ -415,9 +415,7 @@ class Game {
   groupEngineerDraw = () => {
     try {
       const cards = this.#dealer.askCards(2);
-      cards.forEach((card) => {
-        this.#engineerHand.draw(card);
-      });
+      this.#engineerHand.addCards(cards);
 
       return cards;
     } catch (error) {
@@ -443,17 +441,20 @@ class Game {
   };
 
   groupEngineerPlay = (cardIndex, towerIndex) => {
-    if (!this.PlayTargets[cardIndex]?.includes(towerIndex)) {
+    const cardSlots = this.#activeHandCards[cardIndex].slots;
+    const cardRace = this.#activeHandCards[cardIndex].race;
+    const towerNextSlot = this.currentPlayer.towers.nextSlots[towerIndex];
+
+    if (!cardSlots.includes(towerNextSlot)) {
       throw new Error("You can't build this tower with this card!");
     }
-    const cardRace = activeHandCards[cardIndex].race;
     if (!this.#lastRace === cardRace) {
       throw new Error('You can only play same race card!');
     }
 
     const card = this.#takeCardFromActiveHand([cardIndex])[0];
     const buildResult = this.currentPlayer.towers.buildTower(card, towerIndex);
-    const result = { ...buildResult, discardCard: card };
+    const result = { ...buildResult, card };
     this.#setEngBuildResults(result);
 
     return result;

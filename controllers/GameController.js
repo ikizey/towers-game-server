@@ -114,7 +114,10 @@ class GameController {
   #beginAction = () => {
     const canDraw = this.#game.canDrawCard;
     const canSwap = this.#game.canSwap;
-    const canPlay = this.#game.playTargets;
+    const gameTargets = this.#game.playTargets;
+    const canPlay = gameTargets.map((card) =>
+      card?.map((tower, slot) => tower + slot * 3).filter((slot) => !!slot)
+    );
     const client = this.clients[this.#game.currentPlayerIndex];
     const actions = {
       canDraw,
