@@ -1,48 +1,71 @@
 const { Tower } = require('./Tower');
 
 class Towers {
-  #towers = [];
+  #towers = [new Tower(), new Tower(), new Tower(), new Tower(), new Tower()]; //for completions
 
-  constructor(towersNum) {
-    this.towers = [...new Array(towersNum)].map((_) => new Tower());
+  constructor(towersAmount) {
+    this.towers = [...new Array(towersAmount)].map((_) => new Tower());
+  }
+
+  #getTower(towerIndex) {
+    return this.#towers[towerIndex];
   }
 
   get towers() {
-    return this.#towers.filter((tower) => tower !== null);
-  }
-
-  get usableSlots() {
-    const slots = this.towers.map((tower) => tower.nextEmptySlot);
-    const uniqSlots = [...new Set(slots)];
-    const nonNullSlots = uniqSlots.filter((slot) => slot !== null);
-
-    if (nonNullSlots.length === 0) return null;
-    return nonNullSlots;
+    return this.#towers;
   }
 
   get nextSlots() {
     return this.#towers.map((tower) => tower.nextEmptySlot);
   }
 
-  get availSlots() {
-    return [...new Set(this.nextSlots)].filter((slot) => slot !== null);
+  // get activeTowerIndex() {
+  //   return this.#towers
+  //     .map((tower, index) => (tower.activeTower ? index : undefined))
+  //     .filter((towerIndex) => !!towerIndex)[0];
+  // }
+
+  get activeTower() {
+    return this.#towers.filter((tower) => tower.activeSlot !== null)[0];
   }
 
-  getTower = (id) => {
-    const index = this.#towers.findIndex((tower) => tower.id === id);
-    return this.#towers[index];
+  get activeSlot() {
+    return this.activeTower.activeSlot;
+  }
+
+  get activeSlotItem() {
+    return this.activeTower.activeSlotItem;
+  }
+
+  nextActiveSlot = () => {
+    this.activeTower.nextActiveSlot();
   };
+
+  unsetActiveSlot = () => {
+    this.activeTower.unsetActiveSlot();
+  };
+
+  get activeTowerItems() {
+    return this.activeTower.items;
+  }
 
   buildTower = (card, towerIndex) => {
-    return this.#towers[towerIndex].build(card);
+    this.#getTower(towerIndex).build(card);
+
+    if (!this.#getTower(towerIndex).isComplete) return;
+    this.#towers
+      .filter((_, index) => towerIndex !== index)
+      .forEach((tower) => {
+        tower.unsetActiveSlot();
+      });
   };
 
-  destroyTop = (towerIndex) => {
-    return this.#towers[towerIndex].destroyTop();
+  destroyTowerTop = (towerIndex) => {
+    return this.#getTower(towerIndex).destroyTop();
   };
 
-  destroy = (towerIndex) => {
-    return this.#towers[towerIndex].destroy();
+  destroyTower = (towerIndex) => {
+    return this.#getTower(towerIndex).destroy();
   };
 }
 

@@ -6,7 +6,11 @@ class Hand extends Cards {
   }
 
   get cardsList() {
-    return this.cards.map((card) => card);
+    return [...this.cards];
+  }
+
+  getCards(...cardIndices) {
+    return this.cards.filter((_, index) => cardIndices.includes(index));
   }
 
   get size() {

@@ -1,5 +1,5 @@
 const TOWER_SLOTS = require('./TowerSlots');
-
+const { Card } = require('./Card');
 class TowerBuildError extends Error {
   constructor(message) {
     super(message);
@@ -8,9 +8,14 @@ class TowerBuildError extends Error {
 
 class Tower {
   #slots = [...Tower.#defaultSlots];
+  #activeSlot = TOWER_SLOTS.BASE; //for completions
 
   static #emptySlot = null;
   static #defaultSlots = [Tower.#emptySlot, Tower.#emptySlot, Tower.#emptySlot];
+
+  get items() {
+    return [...this.#slots];
+  }
 
   get nextEmptySlot() {
     if (this.isComplete) return null;
@@ -18,8 +23,8 @@ class Tower {
     return this.#slots.findIndex((slot) => slot === Tower.#emptySlot);
   }
 
-  get currentSlot() {
-    if (this.isDestroyed) return null;
+  get lastBuiltSlot() {
+    if (this.#isDestroyed) return null;
     if (this.isComplete) return TOWER_SLOTS.TOP;
     return this.nextEmptySlot - 1;
   }
@@ -29,60 +34,59 @@ class Tower {
     return validSlots.length === 0;
   };
 
-  get cards() {
-    return this.#slots.filter((slot) => slot !== Tower.#emptySlot).reverse();
-  }
-
   get isComplete() {
     return this.#slots[TOWER_SLOTS.TOP] !== Tower.#emptySlot;
   }
 
-  get isIncomplete() {
-    return !this.isComplete;
-  }
-
-  get isMonoRace() {
-    if (this.isIncomplete) return;
-
-    return (
-      this.#slots[TOWER_SLOTS.BASE].sameRace(this.#slots[TOWER_SLOTS.MIDDLE]) &&
-      this.#slots[TOWER_SLOTS.BASE].race.sameRace(
-        this.#slots[TOWER_SLOTS.TOP].race
-      )
-    );
-  }
-
-  get #monoRace() {
-    return this.isMonoRace ? this.cards[0].race : false;
-  }
-
-  get isDestroyed() {
+  get #isDestroyed() {
     return this.#slots[TOWER_SLOTS.BASE] === Tower.#emptySlot;
+  }
+
+  #setNextActiveSlot = () => {
+    if (!this.isComplete) return;
+    this.nextActiveSlot();
+  };
+
+  nextActiveSlot = () => {
+    if (this.#activeSlot === null) {
+      this.#activeSlot = TOWER_SLOTS.TOP;
+    } else if (this.#activeSlot === TOWER_SLOTS.BASE) {
+      this.#activeSlot === null;
+    } else {
+      this.#activeSlot -= 1;
+    }
+  };
+
+  unsetActiveSlot = () => {
+    this.#activeSlot = null;
+  };
+
+  get activeSlot() {
+    return this.#activeSlot;
+  }
+
+  get activeSlotItem() {
+    return this.#activeSlot ? this.#slots[this.#activeSlot] : null;
+  }
+
+  get isActive() {
+    return this.#activeSlot !== null;
   }
 
   build = (card) => {
     // if (this.#cantBuild(card.slots)) return; //TODO! Throw
 
     this.#slots[this.nextEmptySlot] = card;
-
-    if (this.isComplete) {
-      return {
-        isComplete: this.isComplete,
-        monoRace: this.#monoRace,
-        groups: this.cards.map((card) => card.group),
-        index: this.#id,
-      };
-    }
-    return { isComplete };
+    this.#setNextActiveSlot();
   };
 
   get #cantDestroyTop() {
-    return this.currentSlot === Tower.#emptySlot;
+    return this.lastBuiltSlot === Tower.#emptySlot;
   }
 
   destroyTop = () => {
     //TODO! throw if cant destroy top
-    return this.cards.splice(this.currentSlot, 1, Tower.#emptySlot);
+    return this.#slots.splice(this.lastBuiltSlot, 1, Tower.#emptySlot);
   };
 
   get #cantDestroy() {
@@ -92,8 +96,8 @@ class Tower {
   destroy = () => {
     //TODO! throw if cant destroy
 
-    return this.cards.splice(
-      this.currentSlot,
+    return this.#slots.splice(
+      TOWER_SLOTS.BASE,
       Infinity,
       ...Tower.#defaultSlots
     );

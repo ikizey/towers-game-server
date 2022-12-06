@@ -5,41 +5,51 @@ class Player {
   #id;
   name;
   #hand = new Hand();
+  tempHand = new Hand();
   #towers;
 
-  constructor(id, name, maxTowers) {
+  constructor(id, name, towersAmount) {
     this.#id = id;
     this.name = name;
-    this.#towers = new Towers(maxTowers);
+    this.#towers = new Towers(towersAmount);
   }
 
   get id() {
     return this.#id;
   }
 
-  get cards() {
-    return this.#hand.cardsList;
+  get activeCards() {
+    return [...this.#activeHand.cards];
   }
 
   get amountOfCards() {
-    return this.cards.length;
+    return this.hand.length;
   }
 
-  drawCard = (card) => {
-    this.#hand.addCard(card);
+  getCards = (...cardIndices) => {
+    return this.#activeHand.getCards(...cardIndices);
   };
 
-  drawCards = (...cards) => {
-    this.#hand.addCards(...cards);
+  addCards = (cards, engHand = undefined) => {
+    engHand ? this.tempHand.addCard(...cards) : this.#hand.addCards(...cards);
   };
 
-  discardCards = (...cardIndices) => {
-    return this.#hand.remove(...cardIndices);
+  removeCards = (...cardIndices) => {
+    return this.#activeHand.remove(...cardIndices);
   };
 
   get towers() {
     return this.#towers;
   }
+
+  get #activeHand() {
+    return this.tempHand.size > 0 ? this.tempHand : this.#hand;
+  }
+
+  build = (cardIndex, towerIndex) => {
+    const card = this.#removeCards([cardIndex])[0];
+    this.#towers.buildTower(card, towerIndex);
+  };
 }
 
 module.exports = { Player };

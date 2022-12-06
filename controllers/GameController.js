@@ -71,12 +71,8 @@ class GameController {
     client.emit(messageType, data);
   };
 
-  #isCurrentPlayer = (clientUid) => {
-    return this.#game.currentPlayer.id === clientUid;
-  };
-
   #isNotCurrentPlayer = (clientUid) => {
-    return !this.#isCurrentPlayer(clientUid);
+    return this.#game.currentPlayer.id !== clientUid;
   };
 
   get #currentPlayerClient() {
@@ -202,7 +198,7 @@ class GameController {
   };
 
   #checkForGroups = () => {
-    if (this.#game.activeGroups.length > 0) {
+    if (this.#game.activeGroup) {
       this.#whisperGroup(this.#currentPlayerClient);
     } else {
       this.#checkForActions();
@@ -216,8 +212,8 @@ class GameController {
     if (this.#game.currentPlayerActions < 1) return;
     try {
       const towerIndex = Math.floor(targetSlotIndex / 3);
-      const result = this.#game.build(cardIndex, towerIndex);
-      this.#announceBuilt(cardIndex, targetSlotIndex, result.card.id);
+      const card = this.#game.build(cardIndex, towerIndex);
+      this.#announceBuilt(cardIndex, targetSlotIndex, card.id);
     } catch (error) {
       this.#beginAction();
       client.emit('error', { message: error.message });
@@ -240,18 +236,12 @@ class GameController {
     });
   };
 
-  get #activeGroupSlot() {
-    const towerIndex = this.#game.activeTowerIndex;
-    const slot = this.#game.activeGroups.length - 1;
-    return towerIndex * 3 + slot;
-  }
-
   get #activeGroup() {
-    return this.#game.activeGroups.slice(-1);
+    return this.#game.activeGroup;
   }
 
   get #groupData() {
-    const source = this.#activeGroupSlot;
+    const source = this.#game.activeGroupSlot;
     if (this.#activeGroup === GROUP.NONE) {
       return { type: PLAYER_MSG.GROUP_NONE, data: { source } };
     } else if (this.#activeGroup === GROUP.ENGINEER) {
@@ -292,7 +282,7 @@ class GameController {
     try {
       if (this.#game.activeWarCryRace) {
         this.#announceWarCry();
-      } else if (this.#game.activeGroups.length > 0) {
+      } else if (this.#game.activeGroup) {
         this.#whisperGroup(this.#currentPlayerClient);
       } else {
         this.#checkForActions();
@@ -306,7 +296,7 @@ class GameController {
 
   #isAlreadyDiscarded = (playerIndex) => {
     return (
-      this.#game.warCryDone[playerIndex] >= this.#game.gameRules.WarCryDiscard
+      this.#game.warCryDone[playerIndex] >= this.#game.gameRules.WarCryDiscard //TODO! Wrong!
     );
   };
 
