@@ -1,7 +1,7 @@
 const { Dealer } = require('./Dealer');
 const { Player } = require('../models/Player');
-const { shuffle } = require('../globals');
 const { Hand } = require('./Hand');
+const { shuffle, range } = require('../globals');
 
 class ActionError extends Error {
   constructor(message) {
@@ -73,7 +73,7 @@ class Game {
     return this.#players.length;
   }
 
-  #decreaseActions = () => {
+  #spendAction = () => {
     this.#currentPlayerActions -= 1;
   };
 
@@ -81,7 +81,7 @@ class Game {
     this.#currentPlayerActions = this.gameRules.ActionsPerTurn;
   };
 
-  #resetLastPlayedRace = () => {
+  #resetLastRace = () => {
     this.#lastRace = undefined;
   };
 
@@ -89,32 +89,43 @@ class Game {
     return this.#currentPlayerActions;
   }
 
+  #getPlayer = (index) => {
+    this.#players[index];
+  };
+
   get currentPlayer() {
-    return this.#players[this.#currentPlayerIndex];
+    return this.#getPlayer(this.#currentPlayerIndex);
   }
 
   get currentPlayerIndex() {
     return this.#currentPlayerIndex;
   }
 
-  begin = () => {
-    const cardSets = [];
-    this.#players.forEach((player) => {
-      const cards = [];
-      for (let i = this.gameRules.StartWithCards; i > 0; i -= 1) {
-        const card = this.#dealer.askCard();
-        player.drawCard(card);
-        cards.push(card);
-      }
-      cardSets.push(cards);
-    });
-    return cardSets;
+  #cardsDeckToPlayer = (cardsAmount, playerIndex) => {
+    const _playerIndex = playerIndex || this.#currentPlayerIndex;
+    const cards = this.#dealer.askCards(cardsAmount);
+    this.#getPlayer(_playerIndex).drawCards(cards);
+    return cards;
   };
 
-  nextPlayer = () => {
+  #cardsPlayerToGraveyard = (cardIndices, playerIndex) => {
+    const _playerIndex = playerIndex || this.#currentPlayerIndex;
+    const player = this.#players[_playerIndex];
+    const discardedCards = player.discardCards(...cardIndices);
+    this.#dealer.askBury(...discardedCards);
+    return discardedCards;
+  };
+
+  begin = () => {
+    return this.#players.map((_, index) =>
+      this.#cardsDeckToPlayer(this.gameRules.StartWithCards, index)
+    );
+  };
+
+  nextTurn = () => {
     this.#currentPlayerIndex =
       (this.currentPlayerIndex + 1) % this.#playersAmount;
-    this.#resetLastPlayedRace();
+    this.#resetLastRace();
     this.#resetActions();
     return this.#currentPlayerIndex;
   };
@@ -125,54 +136,35 @@ class Game {
 
   playerDraw = () => {
     try {
-      const card = this.#dealer.askCard();
-      this.currentPlayer.draw(card);
+      const cards = this.#cardsDeckToPlayer(1);
 
-      this.currentPlayer.decreaseActions();
-      return card.id;
+      this.#spendAction();
+      return cards;
     } catch (error) {
       throw error;
     }
   };
 
-  get #usableSlotsIndices() {
-    //* gameController logic spilled
-    return this.currentPlayer.towers
-      .map((tower, index) =>
-        tower.nextEmptySlot !== null
-          ? tower.nextEmptySlot + index * 3 // magic
-          : null
-      )
-      .filter((index) => index !== null);
-  }
-
-  get #currentPlayRaces() {
-    return this.#lastRace
-      ? [this.#lastRace]
-      : [RACE.ELF, RACE.ORC, RACE.HUMAN, RACE.UNDEAD];
-  }
-
-  get currentPlayTargets() {
-    //TODO!! INCORRECT
-    //* gameController logic spilled
-    const cards = this.currentPlayer.hand;
-    const availableSlots = this.#usableSlotsIndices;
-    return cards
-      .filter((card) => this.#currentPlayRaces.includes(card.race))
-      .map(
-        (card) => availableSlots.map((slot) => card.slot === slot % 3) //reverse magic
+  swapCards = (...cardIndices) => {
+    const lostAmount = cardIndices.length;
+    if (lostAmount < this.gameRules.SwapCardsRatio) {
+      throw new ActionError(
+        `Should swap at least ${this.gameRules.SwapCardsRatio} cards.`
       );
-  }
+    }
 
-  get workerPlayTargets() {
-    //TODO!! INCORRECT
-    //* gameController logic spilled
-    const cards = this.currentPlayer.hand;
-    const availableSlots = this.#usableSlotsIndices;
-    return cards.map(
-      (card) => availableSlots.map((slot) => card.slot === slot % 3) //reverse magic
-    );
-  }
+    const gainAmount = Math.floor(lostAmount / this.gameRules.SwapCardsRatio);
+    if (gainAmount > this.#dealer.CardsTotal) {
+      throw new ActionError('Not Enough cards in the deck. Choose less cards.');
+    }
+
+    const discardedCards = this.#cardsPlayerToGraveyard(cardIndices);
+    const newCards = this.#cardsDeckToPlayer(gainAmount);
+
+    this.#spendAction();
+
+    return { newCards, discardedCards };
+  };
 
   #setBuildResults = (result) => {
     if (result.isComplete) {
@@ -190,63 +182,50 @@ class Game {
     this.#lastRace = race;
   };
 
-  build = (cardIndex, targetSlotIndex) => {
-    //* gameController logic spilled
-    if (!this.currentPlayTargets[cardIndex]?.includes(targetSlotIndex)) {
-      throw new ActionError("You can't build this tower with this card!");
+  build = (cardIndex, towerIndex) => {
+    const cardSlots = this.#activeHandCards[cardIndex].slots;
+    const cardRace = this.#activeHandCards[cardIndex].race;
+    const towerNextSlot = this.currentPlayer.towers.nextSlots[towerIndex];
+
+    if (!cardSlots.includes(towerNextSlot)) {
+      throw new Error("You can't build this tower with this card!");
     }
-    const cardRace = this.currentPlayer.cards[cardIndex].race;
-    if (!this.currentPlayRaces.includes(cardRace)) {
-      throw new ActionError('You can only play same race card!');
+    if (!this.#lastRace === cardRace) {
+      throw new Error('You can only play same race card!');
     }
 
-    const cardId = this.currentPlayer.cards[cardIndex].id;
-    const towerIndex = Math.floor(targetSlotIndex / 3);
-    const card = this.currentPlayer.discardCards([cardIndex])[0];
+    const card = this.#takeCardFromActiveHand([cardIndex])[0];
     const buildResult = this.currentPlayer.towers.buildTower(card, towerIndex);
-    const result = { ...buildResult, cardId };
+    const result = { ...buildResult, card };
     this.#setBuildResults(result);
     this.#setLastPlayedRace(cardRace);
 
-    this.#decreaseActions();
+    this.#spendAction();
+    return result;
+  };
 
+  groupWorker = (cardIndex, towerIndex) => {
+    const cardSlots = this.#activeHandCards[cardIndex].slots;
+    const towerNextSlot = this.currentPlayer.towers.nextSlots[towerIndex];
+    if (!cardSlots.includes(towerNextSlot)) {
+      throw new Error("You can't build this tower with this card!");
+    }
+
+    const card = this.#takeCardFromActiveHand([cardIndex])[0];
+    const buildResult = this.currentPlayer.towers.buildTower(card, towerIndex);
+    const result = { ...buildResult, cardId };
+    this.#setBuildResults(result);
+
+    this.#removeGroup();
     return result;
   };
 
   get canSwap() {
     return (
-      this.currentPlayer.hand.length < this.gameRules.SwapCardsRatio &&
+      this.currentPlayer.hand.length >= this.gameRules.SwapCardsRatio &&
       this.#dealer.canDeal
     );
   }
-
-  swapCards = (...cardIndices) => {
-    const lostAmount = cardIndices.length;
-    if (lostAmount < this.gameRules.SwapCardsRatio) {
-      throw new ActionError(
-        `Should swap at least ${this.gameRules.SwapCardsRatio} cards.`
-      );
-    }
-
-    const gainAmount = Math.floor(lostAmount / this.gameRules.SwapCardsRatio);
-    if (gainAmount > this.#dealer.CardsTotal) {
-      throw new ActionError('Not Enough cards in the deck. Choose less cards.');
-    }
-
-    const discardedCards = this.currentPlayer.discardCards(...cardIndices);
-    this.#dealer.askBury(...discardedCards);
-
-    const newCards = [...new Array(gainAmount)].map((_) =>
-      this.#dealer.askCard()
-    );
-    newCards.forEach((card) => {
-      this.currentPlayer.drawCard(card);
-    });
-
-    this.#decreaseActions();
-
-    return { newCards, discardedCards };
-  };
 
   #checkWrongCards = (discardAmount, cardRacesToDiscard) => {
     return (
@@ -326,29 +305,13 @@ class Game {
     }
 
     try {
-      const cards = [this.#dealer.askCard(), this.#dealer.askCard()];
+      const cards = this.#dealer.askCards(2);
       cards.forEach((card) => this.currentPlayer.draw(card));
       this.#removeGroup();
       return cards.map((card) => card.id);
     } catch (error) {
       throw error;
     }
-  };
-
-  groupWorker = (cardIndex, targetSlotIndex) => {
-    if (!this.workerPlayTargets[cardIndex]?.includes(targetSlotIndex)) {
-      throw new Error("You can't build this tower with this card!");
-    }
-
-    const cardId = this.currentPlayer.cards[cardIndex].id;
-    const towerIndex = Math.floor(targetSlotIndex / 3);
-    const card = this.currentPlayer.discardCards([cardIndex])[0];
-    const buildResult = this.currentPlayer.towers.buildTower(card, towerIndex);
-    this.#removeGroup();
-    const result = { ...buildResult, cardId };
-    this.#setBuildResults(result);
-
-    return result;
   };
 
   get saboteurTargets() {
@@ -419,19 +382,19 @@ class Game {
       : this.currentPlayer.hand.cards;
   }
 
-  // get freePlayTargets() {
-  //   const cards = this.#activeHandCards;
-  //   const nextSlots = this.currentPlayer.towers.nextSlots;
+  get freePlayTargets() {
+    const cards = this.#activeHandCards;
+    const nextSlots = this.currentPlayer.towers.nextSlots;
 
-  //   return cards.map((card) =>
-  //     nextSlots.map((slot) =>
-  //       card.slots.reduce(
-  //         (prev, cur) => (prev ? prev : cur === slot ? cur : prev),
-  //         null
-  //       )
-  //     )
-  //   );
-  // }
+    return cards.map((card) =>
+      nextSlots.map((slot) =>
+        card.slots.reduce(
+          (prev, cur) => (prev ? prev : cur === slot ? cur : prev),
+          null
+        )
+      )
+    );
+  }
 
   get playTargets() {
     const cards = this.#activeHandCards;
@@ -451,7 +414,7 @@ class Game {
 
   groupEngineerDraw = () => {
     try {
-      const cards = [this.#dealer.askCard(), this.#dealer.askCard()];
+      const cards = this.#dealer.askCards(2);
       cards.forEach((card) => {
         this.#engineerHand.draw(card);
       });

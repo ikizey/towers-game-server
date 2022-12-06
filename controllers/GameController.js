@@ -105,7 +105,7 @@ class GameController {
   };
 
   #beginTurn = () => {
-    this.#game.nextPlayer();
+    this.#game.nextTurn();
     this.#announce(GAME_MSG.NEW_TURN, {
       playerIndex: this.#game.currentPlayerIndex,
     });
@@ -114,7 +114,7 @@ class GameController {
   #beginAction = () => {
     const canDraw = this.#game.canDrawCard;
     const canSwap = this.#game.canSwap;
-    const canPlay = this.#game.currentPlayTargets;
+    const canPlay = this.#game.playTargets;
     const client = this.clients[this.#game.currentPlayerIndex];
     const actions = {
       canDraw,
@@ -141,7 +141,7 @@ class GameController {
     const release = await this.#mutex.acquire();
     if (this.#game.currentPlayerActions < 1) return;
     try {
-      const cardIds = [this.#game.playerDraw()];
+      const cardIds = this.#game.playerDraw().map((card) => card.id);
       this.#whisperCardsAddedToHand(client, cardIds);
       this.#announceCardsAddedToHand(cardIds.length, null);
 
@@ -212,8 +212,9 @@ class GameController {
     const release = await this.#mutex.acquire();
     if (this.#game.currentPlayerActions < 1) return;
     try {
-      const result = this.#game.build(cardIndex, targetSlotIndex);
-      this.#announceBuilt(cardIndex, targetSlotIndex, result.cardId);
+      const towerIndex = Math.floor(targetSlotIndex / 3);
+      const result = this.#game.build(cardIndex, towerIndex);
+      this.#announceBuilt(cardIndex, targetSlotIndex, result.card.id);
     } catch (error) {
       this.#beginAction();
       client.emit('error', { message: error.message });
@@ -255,7 +256,7 @@ class GameController {
     } else if (this.#activeGroup === GROUP.ORACLE) {
       return { type: PLAYER_MSG.GROUP_ORACLE, data: { source } };
     } else if (this.#activeGroup === GROUP.WORKER) {
-      const canPlay = this.#game.workerPlayTargets;
+      const canPlay = this.#game.freePlayTargets;
       return { type: PLAYER_MSG.GROUP_WORKER, data: { source, canPlay } };
     } else if (this.#activeGroup === GROUP.MAGE) {
       const gameTargetSets = this.#game.MageTargets;
@@ -473,7 +474,7 @@ class GameController {
   };
 
   #whisperEngineerCanPlay = (client) => {
-    const gameTargets = this.#game.PlayTargets;
+    const gameTargets = this.#game.playTargets;
     const canPlay = gameTargets.map((card) =>
       card?.map((tower, slot) => tower + slot * 3).filter((slot) => !!slot)
     );

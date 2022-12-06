@@ -41,20 +41,6 @@ class Dealer {
     return cards;
   };
 
-  askCard = () => {
-    if (this.#deck.isEmpty) {
-      if (this.#graveYard.isEmpty) {
-        throw new Error('Dealer: no more cards in the Game');
-      }
-      const cards = this.#graveYard.removeAll();
-      shuffle(cards);
-      this.#deck.cards = cards;
-    }
-    const card = this.#deck.getTopCard();
-    //TODO reshuffle, if empty after taking card
-    return card;
-  };
-
   askBury = (...cards) => {
     this.#graveYard.add(...cards);
   };
