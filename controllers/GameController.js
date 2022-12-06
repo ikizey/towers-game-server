@@ -389,7 +389,7 @@ class GameController {
     const release = await this.#mutex.acquire();
     try {
       const result = this.#game.groupWorker(cardIndex, targetSlotIndex);
-      this.#announceBuilt(cardIndex, targetSlotIndex, result.cardId);
+      this.#announceBuilt(cardIndex, targetSlotIndex, result.card.id);
 
       this.#checkForGroups();
     } catch (error) {
