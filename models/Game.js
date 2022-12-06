@@ -90,7 +90,7 @@ class Game {
   }
 
   #getPlayer = (index) => {
-    this.#players[index];
+    return this.#players[index];
   };
 
   get currentPlayer() {
@@ -213,7 +213,7 @@ class Game {
 
     const card = this.#takeCardFromActiveHand([cardIndex])[0];
     const buildResult = this.currentPlayer.towers.buildTower(card, towerIndex);
-    const result = { ...buildResult, cardId };
+    const result = { ...buildResult, card };
     this.#setBuildResults(result);
 
     this.#removeGroup();
@@ -331,10 +331,10 @@ class Game {
   };
 
   get MageTargets() {
-    return this.#players.towers.map((_, index) =>
+    return this.#players.map((player, index) =>
       index === this.currentPlayerIndex
         ? []
-        : this.towers.map((tower) => tower.currentSlot)
+        : player.towers.map((tower) => tower.currentSlot)
     );
   }
 
@@ -365,7 +365,7 @@ class Game {
       throw new Error('Wrong target! You must choose an opponent tower.');
     }
 
-    const cards = this.#players[targetPlayerIndex].towers.destroy(towerIndex);
+    const cards = this.#getPlayer(targetPlayerIndex).towers.destroy(towerIndex);
     this.#dealer.askBury(cards);
     this.#removeGroup();
 
