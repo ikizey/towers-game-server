@@ -7,7 +7,7 @@ class TowerBuildError extends Error {
 }
 
 class Tower {
-  #slots = [...Tower.#defaultSlots]; // BASE, MIDDLE, TOP
+  #slots = [...Tower.#defaultSlots];
 
   static #emptySlot = null;
   static #defaultSlots = [Tower.#emptySlot, Tower.#emptySlot, Tower.#emptySlot];
@@ -82,7 +82,7 @@ class Tower {
 
   destroyTop = () => {
     //TODO! throw if cant destroy top
-    return this.cards.splice(this.currentSlot, 1, null);
+    return this.cards.splice(this.currentSlot, 1, Tower.#emptySlot);
   };
 
   get #cantDestroy() {
