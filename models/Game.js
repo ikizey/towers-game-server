@@ -1,8 +1,7 @@
 const { Dealer } = require('./Dealer');
 const { Player } = require('../models/Player');
 const GROUP = require('./Group');
-const { Hand } = require('./Hand');
-const { shuffle, range } = require('../globals');
+const { shuffle } = require('../globals');
 
 class ActionError extends Error {
   constructor(message) {
@@ -182,7 +181,7 @@ class Game {
     if (!cardSlots.includes(towerNextSlot)) {
       throw new Error("You can't build this tower with this card!");
     }
-    if (!this.#activeGroup === GROUP.WORKER) {
+    if (!this.activeGroup === GROUP.WORKER) {
       const cardRace = card.race;
       if (!this.#firstRace === cardRace) {
         throw new Error('You can only play same race card!');
@@ -197,7 +196,7 @@ class Game {
 
   get canSwap() {
     return (
-      this.currentPlayer.cardsAmount >= this.gameRules.SwapCardsRatio &&
+      this.currentPlayer.amountOfCards >= this.gameRules.SwapCardsRatio &&
       this.#dealer.canDeal
     );
   }
@@ -205,26 +204,26 @@ class Game {
   #checkWrongCards = (discardAmount, cardRacesToDiscard) => {
     return (
       (discardAmount === this.gameRules.WarCryDiscardSameRace &&
-        !cardRacesToDiscard.includes(activeWarCry)) ||
+        !cardRacesToDiscard.includes(this.activeWarCryRace)) ||
       (discardAmount === this.gameRules.WarCryDiscardOtherRace &&
-        cardRacesToDiscard.includes(activeWarCry))
+        cardRacesToDiscard.includes(this.activeWarCryRace))
     );
   };
 
   #checkTooFewCards = (discardAmount, cardRacesToDiscard) => {
     return (
-      (cardRacesToDiscard.includes(activeWarCry) &&
+      (cardRacesToDiscard.includes(this.activeWarCryRace) &&
         discardAmount < this.gameRules.WarCryDiscardSameRace) ||
-      (!cardRacesToDiscard.includes(activeWarCry) &&
+      (!cardRacesToDiscard.includes(this.activeWarCryRace) &&
         discardAmount < this.gameRules.WarCryDiscardOtherRace)
     );
   };
 
   #checkTooManyCards = (discardAmount, cardRacesToDiscard) => {
     return (
-      (cardRacesToDiscard.includes(activeWarCry) &&
+      (cardRacesToDiscard.includes(this.activeWarCryRace) &&
         discardAmount > this.gameRules.WarCryDiscardSameRace) ||
-      (!cardRacesToDiscard.includes(activeWarCry) &&
+      (!cardRacesToDiscard.includes(this.activeWarCryRace) &&
         discardAmount > this.gameRules.WarCryDiscardOtherRace)
     );
   };
