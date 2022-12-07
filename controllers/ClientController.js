@@ -23,6 +23,10 @@ class ClientController {
       this.clients.splice(clientIndex, 1);
     }
   };
+
+  get totalPlayers() {
+    return this.#clients.length;
+  }
 }
 
 const clientController = new ClientController();
