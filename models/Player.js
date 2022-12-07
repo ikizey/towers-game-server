@@ -47,7 +47,7 @@ class Player {
   }
 
   build = (cardIndex, towerIndex) => {
-    const card = this.#removeCards([cardIndex])[0];
+    const card = this.removeCards([cardIndex])[0];
     this.#towers.buildTower(card, towerIndex);
   };
 }
