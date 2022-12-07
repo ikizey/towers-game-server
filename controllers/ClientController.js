@@ -8,10 +8,11 @@ class ClientController {
   get #uids() {
     return this.#clients.map((client) => client.uid);
   }
+
   addClient = (client) => {
     const uids = this.#uids;
     if (!uids.includes(client.uid)) {
-      this.push(client);
+      this.#clients.push(client);
     }
   };
 
