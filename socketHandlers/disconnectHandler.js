@@ -5,8 +5,8 @@ const { preGameController } = require('../controllers/PreGameController');
 const disconnectHandler = (client) => {
   client.on('disconnect', () => {
     queuesController.remove(client);
-    clientsController.remove(client);
-    preGameController.removeClient(client.id);
+    clientsController.removeClient(client.uid);
+    preGameController.removeClient(client.uid);
 
     client.gameController = null;
     //TODO concede in game (if exist)
