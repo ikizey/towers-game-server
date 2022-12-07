@@ -90,7 +90,11 @@ class PreGame {
     this.#admin = admin;
     this.#clients.push(admin);
     this.#isPrivate = isPrivate;
-    admin.emit('pre-game-created', { name });
+    admin.emit('pre-game-created', {
+      name,
+      id: this.id,
+      playersToStart,
+    });
   }
 
   get id() {
@@ -148,7 +152,7 @@ class PreGame {
       this.#clients.push(client);
     }
 
-    client.emit('pre-game-name', { gameName: this.#name });
+    client.emit('pre-game-name', { id: this.id, name: this.#name });
     if (this.isReady) {
       this.#announce('pre-game-ready', {});
     }
@@ -168,9 +172,9 @@ class PreGame {
     }
     if (clientIndex !== -1) {
       this.#clients.splice(clientIndex, 1);
-      client.emit('pre-game-left');
+      client.emit('pre-game-left', {});
       this.#clients.forEach((cl) => {
-        cl.emit('pre-game-player-left', { id: client.id, name: client.name });
+        cl.emit('pre-game-player-left', { id: client.uid, name: client.name });
       });
       this.#announce('pre-game-not-ready', {});
     }
