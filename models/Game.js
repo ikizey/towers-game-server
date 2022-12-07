@@ -188,7 +188,7 @@ class Game {
       }
     }
 
-    this.#activeGroup ? this.#removeGroup() : this.#spendAction();
+    this.activeGroup ? this.#removeGroup() : this.#spendAction();
     this.currentPlayer.build(cardIndex, towerIndex);
     this.#setLastPlayedRace(card.race);
     return card;
