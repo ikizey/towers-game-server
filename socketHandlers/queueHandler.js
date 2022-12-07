@@ -8,7 +8,7 @@ const QUEUE_EVENTS = {
   LEAVE_QUEUE: 'leave-queue',
 };
 
-const queueHandler = (io, client) => {
+const queueHandler = (client) => {
   const handleInP2Queue = async () => {
     const queue = QUEUES.P2QUEUE;
     const opponent = queuesController.takeFirst(queue);

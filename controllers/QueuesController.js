@@ -32,14 +32,14 @@ class QueuesController {
   remove = (player) => {
     const playerUid = player.uid;
 
-    this.#QUEUES.forEach(async (queue) => {
-      const release = await this.#mutexes[queue].acquire();
+    this.#QUEUES.forEach(async (_, mutexIndex) => {
+      const release = await this.#mutexes[mutexIndex].acquire();
       try {
-        const index = this.#QUEUES[queue].findIndex(
+        const index = this.#QUEUES[mutexIndex].findIndex(
           (player) => player.uid === playerUid
         );
         if (index >= -1) {
-          this.#QUEUES[queue].splice(index, 1);
+          this.#QUEUES[mutexIndex].splice(index, 1);
         }
       } finally {
         release();
