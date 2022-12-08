@@ -21,8 +21,7 @@ class PreGameController {
   };
 
   addClient = (preGameId, client) => {
-    const preGame = this.#getPreGame(preGameId);
-    preGame.addClient(client);
+    this.#getPreGame(preGameId)?.addClient(client);
   };
 
   #getGameByClient = (clientUid) => {
@@ -38,10 +37,7 @@ class PreGameController {
   };
 
   removeClient = (clientUid) => {
-    const preGame = this.#getGameByClient(clientUid);
-    if (preGame) {
-      preGame.removeClient(clientUid);
-    }
+    this.#getGameByClient(clientUid)?.removeClient(clientUid);
   };
 
   startGame = (preGameId) => {
@@ -62,20 +58,21 @@ class PreGame {
   #name;
   #playersToStart;
   #admin;
-  #clients = [];
-  #isPrivate;
+  #clients = new Map();
+  // #isPrivate;
 
   constructor(name, playersAmount, admin, isPrivate = false) {
     this.#name = name;
     this.#playersToStart = playersAmount;
     this.#admin = admin;
-    this.#clients.push(admin);
-    this.#isPrivate = isPrivate;
+    this.#clients.set(admin.uid, admin);
+    // this.#isPrivate = isPrivate;
     admin.emit('pre-game-created', {
       name,
       id: this.id,
       playersToStart: playersAmount,
     });
+    this.#announcePlayers();
   }
 
   get id() {
@@ -86,43 +83,36 @@ class PreGame {
     return {
       name: this.#name,
       id: this.#id,
-      playersToStart: this.playersToStart,
-      playersAmount: this.playersAmount,
+      playersToStart: this.#playersToStart,
+      playersAmount: this.#playersAmount,
     };
   }
 
-  get clientIds() {
-    return this.#clients.map((client) => client.id);
-  }
-
-  get isPrivate() {
-    return this.#isPrivate;
-  }
-
-  get playersToStart() {
-    return this.#playersToStart;
+  get #playersInfo() {
+    return [...this.#clients.values()].map((client) => ({
+      id: client.uid,
+      name: client.name,
+    }));
   }
 
   hasPlayer = (clientUid) => {
-    return (
-      this.#clients.filter((client) => client.uid === clientUid).length > 0
-    );
+    return this.#clients.has(clientUid);
   };
 
-  get playersAmount() {
-    return this.#clients.length;
-  }
-
-  get #uids() {
-    return this.#clients.map((client) => client.uid);
+  get #playersAmount() {
+    return this.#clients.size;
   }
 
   get isReady() {
-    return this.#clients.length === this.#playersToStart;
+    return this.#clients.size === this.#playersToStart;
   }
 
   #announce(type, message) {
-    this.#clients.forEach((client) => client.emit(type, message));
+    this.#clients.forEach((_, client) => client.emit(type, message));
+  }
+
+  #announcePlayers() {
+    this.#announce('pre-game-player-list', { players: this.#playersInfo });
   }
 
   addClient = (client) => {
@@ -130,45 +120,37 @@ class PreGame {
       client.emit('pre-game-is-full', {});
       return;
     }
-
-    const uids = this.#uids;
-    if (!uids.includes(client.uid)) {
-      this.#clients.forEach((cl) => {
-        cl.emit('pre-game-new-player', { id: client.uid, name: client.name });
-      });
-      this.#clients.push(client);
+    if (this.#clients.has(client.uid)) {
+      return;
     }
 
+    this.#clients.set(client.uid, client);
     client.emit('pre-game-name', {
       id: this.id,
       name: this.#name,
       playersToStart: this.#playersToStart,
     });
+    this.#announcePlayers();
+
     if (this.isReady) {
       this.#announce('pre-game-ready', {});
     }
   };
 
   removeClient = (clientUid) => {
-    //TODO! mutex is needed
-    const clientIndex = this.#clients.findIndex(
-      (client) => client.uid === clientUid
-    );
-    const client = this.#clients[clientIndex];
+    const client = this.#clients.get(clientUid);
+    if (!client) return;
+
     if (client.uid === this.#admin.uid) {
-      this.#clients.forEach((cl) => {
+      this.#clients.forEach((_, cl) => {
         cl.emit('pre-game-admin-left', {});
       });
       return;
     }
-    if (clientIndex !== -1) {
-      this.#clients.splice(clientIndex, 1);
-      client.emit('pre-game-left', {});
-      this.#clients.forEach((cl) => {
-        cl.emit('pre-game-player-left', { id: client.uid, name: client.name });
-      });
-      this.#announce('pre-game-not-ready', {});
-    }
+    this.#clients.delete(clientUid);
+    client.emit('pre-game-left', {});
+    this.#announcePlayers();
+    this.#announce('pre-game-not-ready', {});
   };
 
   startGame = () => {
