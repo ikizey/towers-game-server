@@ -10,7 +10,7 @@ class ClientController {
   };
 
   removeClient = (clientUid) => {
-    this.clients.delete(clientUid);
+    this.#clients.delete(clientUid);
   };
 
   get totalPlayers() {
