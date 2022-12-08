@@ -1,11 +1,11 @@
 const { queuesController } = require('../controllers/QueuesController');
-const { clientsController } = require('../controllers/ClientController');
+const { clientController } = require('../controllers/ClientController');
 const { preGameController } = require('../controllers/PreGameController');
 
 const disconnectHandler = (client) => {
   client.on('disconnect', () => {
     queuesController.remove(client);
-    clientsController.removeClient(client.uid);
+    clientController.removeClient(client.uid);
     preGameController.removeClient(client.uid);
 
     client.gameController = null;
