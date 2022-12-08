@@ -1,5 +1,4 @@
 const { nanoid } = require('nanoid');
-const clientController = require('./ClientController');
 const { GameController } = require('./GameController');
 
 class PreGameController {
