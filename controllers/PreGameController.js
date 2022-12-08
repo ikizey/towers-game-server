@@ -139,7 +139,11 @@ class PreGame {
       this.#clients.push(client);
     }
 
-    client.emit('pre-game-name', { id: this.id, name: this.#name });
+    client.emit('pre-game-name', {
+      id: this.id,
+      name: this.#name,
+      playersToStart: this.#playersToStart,
+    });
     if (this.isReady) {
       this.#announce('pre-game-ready', {});
     }
