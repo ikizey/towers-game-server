@@ -104,11 +104,11 @@ class PreGame {
   }
 
   get isReady() {
-    return this.#clients.size === this.#playersToStart;
+    return this.#playersAmount == this.#playersToStart;
   }
 
   #announce(type, message) {
-    this.#clients.forEach((_, client) => client.emit(type, message));
+    this.#clients.forEach((client, _) => client.emit(type, message));
   }
 
   #announcePlayers() {
@@ -142,9 +142,7 @@ class PreGame {
     if (!client) return;
 
     if (client.uid === this.#admin.uid) {
-      this.#clients.forEach((_, cl) => {
-        cl.emit('pre-game-admin-left', {});
-      });
+      this.#announce('pre-game-admin-left', {});
       return;
     }
     this.#clients.delete(clientUid);
@@ -155,7 +153,7 @@ class PreGame {
 
   startGame = () => {
     const newGameController = new GameController(...this.#clients);
-    this.#clients.forEach((client) => {
+    this.#clients.forEach((client, _) => {
       client.gameController = newGameController;
     });
   };
