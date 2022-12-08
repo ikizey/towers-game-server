@@ -1,33 +1,29 @@
 class ClientController {
-  #clients = [];
+  #clients = new Map(); //uid : {client, name, status}
 
   get clients() {
-    return this.#clients;
-  }
-
-  get #uids() {
-    return this.#clients.map((client) => client.uid);
+    return [...this.#clients].map((client) => client[1]);
   }
 
   addClient = (client) => {
-    const uids = this.#uids;
-    if (!uids.includes(client.uid)) {
-      this.#clients.push(client);
-    }
+    this.#clients.set(client.uid, client);
   };
 
   removeClient = (clientUid) => {
-    const clientIndex = this.#clients.findIndex(
-      (client) => client.uid === clientUid
-    );
-    if (clientIndex !== -1) {
-      this.clients.splice(clientIndex, 1);
-    }
+    this.clients.delete(clientUid);
   };
 
   get totalPlayers() {
-    return this.#clients.length;
+    return this.#clients.size;
   }
+
+  setStatus = (clientUid, status) => {
+    this.#clients.get(clientUid).status = status;
+  };
+
+  getStatus = (clientUid) => {
+    return this.#clients(clientUid).status;
+  };
 }
 
 const clientController = new ClientController();
