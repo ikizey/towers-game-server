@@ -37,7 +37,14 @@ class PreGameController {
   };
 
   removeClient = (clientUid) => {
-    this.#getGameByClient(clientUid)?.removeClient(clientUid);
+    const preGame = this.#getGameByClient(clientUid);
+    preGame?.removeClient(clientUid);
+    preGame?.playersAmount === 0 && this.#remove(PreGame.id);
+  };
+
+  kickClient = (admin, clientUid) => {
+    const preGame = this.#getGameByClient(clientUid);
+    preGame?.kickClient(admin, clientUid);
   };
 
   startGame = (preGameId) => {
@@ -84,7 +91,7 @@ class PreGame {
       name: this.#name,
       id: this.#id,
       playersToStart: this.#playersToStart,
-      playersAmount: this.#playersAmount,
+      playersAmount: this.playersAmount,
     };
   }
 
@@ -99,12 +106,12 @@ class PreGame {
     return this.#clients.has(clientUid);
   };
 
-  get #playersAmount() {
+  get playersAmount() {
     return this.#clients.size;
   }
 
   get isReady() {
-    return this.#playersAmount == this.#playersToStart;
+    return this.playersAmount === this.#playersToStart;
   }
 
   #announce(type, message) {
@@ -147,6 +154,16 @@ class PreGame {
     }
     this.#clients.delete(clientUid);
     client.emit('pre-game-left', {});
+    this.#announcePlayers();
+    this.#announce('pre-game-not-ready', {});
+  };
+
+  kickClient = (admin, clientUid) => {
+    if (admin.uid !== this.#admin.uid) return;
+
+    const client = this.#clients.get(clientUid);
+    this.#clients.delete(clientUid);
+    client.emit('kicked-from-pre-game', {});
     this.#announcePlayers();
     this.#announce('pre-game-not-ready', {});
   };

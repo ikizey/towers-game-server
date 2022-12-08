@@ -9,6 +9,7 @@ const LOBBY_EVENTS = {
   CREATE_PRE_GAME: 'pregame-create',
   JOIN_PRE_GAME: 'pregame-join',
   LEAVE_PRE_GAME: 'pregame-leave',
+  KICK_FROM_PRE_GAME: 'pre-game-kick',
   // LEAVE_LOBBY: 'leave-lobby',
   LIST: 'pregames-list-public',
   LIST_PLAYERS: 'list-all-players',
@@ -65,6 +66,12 @@ const lobbyHandler = (client, io) => {
     announce();
   };
 
+  const onKickFromPreGame = (admin, clientUid) => {
+    preGameController.kickClient(admin, clientUid);
+    clientController.setStatus(clientUid, PLAYER_STATUS.IN_LOBBY);
+    announce();
+  };
+
   // const onLeaveLobby = () => {};
 
   client.on(LOBBY_EVENTS.ENTERS, ({ name, uid }) => onLobbyEnter(name, uid));
@@ -79,6 +86,9 @@ const lobbyHandler = (client, io) => {
     onJoinPreGame(preGameId, client)
   );
   client.on(LOBBY_EVENTS.LEAVE_PRE_GAME, () => onLeavePreGame(client));
+  client.on(LOBBY_EVENTS.KICK_FROM_PRE_GAME, ({ clientUid }) =>
+    onKickFromPreGame(client, clientUid)
+  );
   client.on(LOBBY_EVENTS.START_GAME, preGameController.startGame);
 
   // client.on(LOBBY_EVENTS.ENTER_QUEUE, onLeaveLobby);
