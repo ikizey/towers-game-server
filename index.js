@@ -14,11 +14,9 @@ const io = new Server(server, {
   },
 });
 
-io.on('connection', connectionHandler);
+io.on('connection', (client) => connectionHandler(client, io));
 
 const PORT = 3001;
 server.listen(PORT, () => {
   console.log('Server is running on port: ' + PORT);
 });
-
-module.exports = { io };
