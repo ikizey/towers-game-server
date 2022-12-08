@@ -4,13 +4,13 @@ const { gameHandler } = require('./gameHandler');
 const { lobbyHandler } = require('./lobbyHandler');
 const { queueHandler } = require('./queueHandler');
 
-const connectionHandler = (client) => {
+const connectionHandler = (client, io) => {
   console.info('client connected: ' + client.id);
 
   connectHandler(client);
   disconnectHandler(client);
   gameHandler(client);
-  lobbyHandler(client);
+  lobbyHandler(client, io);
   queueHandler(client);
 };
 
