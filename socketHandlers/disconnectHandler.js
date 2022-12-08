@@ -1,5 +1,5 @@
 const { queuesController } = require('../controllers/QueuesController');
-const clientsController = require('../controllers/ClientController');
+const { clientsController } = require('../controllers/ClientController');
 const { preGameController } = require('../controllers/PreGameController');
 
 const disconnectHandler = (client) => {
