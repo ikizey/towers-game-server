@@ -122,7 +122,7 @@ class PreGame {
   }
 
   #announce(type, message) {
-    clients.forEach((client) => client.emit(type, message));
+    this.#clients.forEach((client) => client.emit(type, message));
   }
 
   addClient = (client) => {
