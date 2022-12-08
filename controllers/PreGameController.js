@@ -3,43 +3,22 @@ const clientController = require('./ClientController');
 const { GameController } = require('./GameController');
 
 class PreGameController {
-  #public = [];
-  #private = [];
-
-  get #both() {
-    return [this.#public, this.#private];
-  }
+  #public = new Map();
+  #private = new Map();
 
   #getPreGame = (preGameId) => {
-    this.#both.forEach((preGameType) => {
-      const preGameIndex = preGameType.findIndex(
-        (preGame) => preGame.id === preGameId
-      );
-      if (preGameIndex !== -1) {
-        return preGame;
-      }
-    });
+    return this.#public.get(preGameId) || this.#private.get(preGameId);
   };
 
   addPreGame = (name, playersAmount, client, isPrivate = false) => {
     const newPreGame = new PreGame(name, playersAmount, client, isPrivate);
 
     const type = isPrivate ? this.#private : this.#public;
-    if (!type.map((pregames) => pregames.id).includes(newPreGame.id)) {
-      type.push(newPreGame);
-    }
+    type.set(newPreGame.id, newPreGame);
   };
 
   #remove = (preGameId) => {
-    this.#both.forEach((preGameType) => {
-      const pregameIndex = preGameType.findIndex(
-        (pregame) => pregame.id === preGameId
-      );
-      if (pregameIndex !== -1) {
-        preGameType.splice(pregameIndex, 1);
-        return;
-      }
-    });
+    this.#public.delete(preGameId) || this.#private.delete(preGameId);
   };
 
   addClient = (preGameId, client) => {
@@ -47,20 +26,23 @@ class PreGameController {
     preGame.addClient(client);
   };
 
+  #getGameByClient = (clientUid) => {
+    //* can return Undefined
+    return (
+      [...this.#public.entries()].filter((preGame) =>
+        preGame.hasPlayer(clientUid)
+      )[0] ||
+      [...this.#private.entries()].filter((preGame) =>
+        preGame.hasPlayer(clientUid)
+      )[0]
+    );
+  };
+
   removeClient = (clientUid) => {
-    this.#both.forEach((preGameType) => {
-      const pregameIndex = preGameType.findIndex((pregame) =>
-        pregame.clientIds.includes(clientUid)
-      );
-      if (pregameIndex !== -1) {
-        const preGame = preGameType[pregameIndex];
-        preGame.removeClient(clientUid);
-        if (preGame.clientIds.length === 0) {
-          preGameType.splice(pregameIndex, 1);
-        }
-        return;
-      }
-    });
+    const preGame = this.#getGameByClient(clientUid);
+    if (preGame) {
+      preGame.removeClient(clientUid);
+    }
   };
 
   startGame = (preGameId) => {
@@ -70,7 +52,7 @@ class PreGameController {
   };
 
   get list() {
-    return this.#public.map((preGame) => preGame.info);
+    return [...this.#public].map((preGame) => preGame[1].info);
   }
 }
 
@@ -121,6 +103,12 @@ class PreGame {
   get playersToStart() {
     return this.#playersToStart;
   }
+
+  hasPlayer = (clientUid) => {
+    return (
+      this.#clients.filter((client) => client.uid === clientUid).length > 0
+    );
+  };
 
   get playersAmount() {
     return this.#clients.length;
