@@ -1,5 +1,6 @@
 const clientController = require('../controllers/ClientController');
 const { preGameController } = require('../controllers/PreGameController');
+const { io } = require('../index');
 
 const LOBBY_EVENTS = {
   ENTERS: 'enters-lobby',
@@ -11,7 +12,7 @@ const LOBBY_EVENTS = {
   START_GAME: 'start-game',
 };
 
-const lobbyHandler = (client, io) => {
+const lobbyHandler = (client) => {
   const onLobbyEnter = (name, uid) => {
     if (name === '') {
       client.emit('no-name', {});
@@ -57,7 +58,7 @@ const lobbyHandler = (client, io) => {
   client.on(LOBBY_EVENTS.LIST, () => onList(client));
   client.on(
     LOBBY_EVENTS.CREATE_PRE_GAME,
-    ({ name, playersAmount, client, isPrivate }) =>
+    ({ name, playersAmount, isPrivate }) =>
       onCreatePreGame(name, playersAmount, client, isPrivate)
   );
   client.on(LOBBY_EVENTS.JOIN_PRE_GAME, ({ preGameId }) =>
