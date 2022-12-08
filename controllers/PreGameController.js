@@ -25,7 +25,7 @@ class PreGameController {
     const newPreGame = new PreGame(name, playersAmount, client, isPrivate);
 
     const type = isPrivate ? this.#private : this.#public;
-    if (!type.map((pregames) => pregames.id).includes(preGame.id)) {
+    if (!type.map((pregames) => pregames.id).includes(newPreGame.id)) {
       type.push(newPreGame);
     }
   };
@@ -50,7 +50,7 @@ class PreGameController {
   removeClient = (clientUid) => {
     this.#both.forEach((preGameType) => {
       const pregameIndex = preGameType.findIndex((pregame) =>
-        pregame.clientIds.includes(clientId)
+        pregame.clientIds.includes(clientUid)
       );
       if (pregameIndex !== -1) {
         const preGame = preGameType[pregameIndex];
@@ -93,7 +93,7 @@ class PreGame {
     admin.emit('pre-game-created', {
       name,
       id: this.id,
-      playersToStart,
+      playersToStart: playersAmount,
     });
   }
 
