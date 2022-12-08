@@ -28,11 +28,11 @@ class PreGameController {
   #getGameByClient = (clientUid) => {
     //* can return Undefined
     return (
-      [...this.#public.entries()].filter((preGame) =>
-        preGame.hasPlayer(clientUid)
+      [...this.#public.values()].filter((preGame) =>
+        preGame?.hasPlayer(clientUid)
       )[0] ||
-      [...this.#private.entries()].filter((preGame) =>
-        preGame.hasPlayer(clientUid)
+      [...this.#private.values()].filter((preGame) =>
+        preGame?.hasPlayer(clientUid)
       )[0]
     );
   };
@@ -51,7 +51,7 @@ class PreGameController {
   };
 
   get list() {
-    return [...this.#public].map((preGame) => preGame[1].info);
+    return [...this.#public.values()].map((preGame) => preGame.info);
   }
 }
 
