@@ -1,8 +1,21 @@
+const PLAYER_STATUS = Object.freeze({
+  IN_GAME: 'in game',
+  IN_PREGAME: 'in pregame',
+  IN_LOBBY: 'in lobby',
+});
 class ClientController {
   #clients = new Map(); //uid : {client, name, status}
 
   get clients() {
     return [...this.#clients].map((client) => client[1]);
+  }
+
+  get players() {
+    return [...this.clients].map((client) => ({
+      id: client[1].uid,
+      name: client[1].name,
+      status: client[1].status,
+    }));
   }
 
   addClient = (client) => {
@@ -28,4 +41,4 @@ class ClientController {
 
 const clientController = new ClientController();
 
-module.exports = clientController;
+module.exports = { clientController, PLAYER_STATUS };
