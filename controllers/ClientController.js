@@ -11,7 +11,7 @@ class ClientController {
   }
 
   get players() {
-    return [...this.clients].map((client) => ({
+    return [...this.clients.entries()].map((client) => ({
       id: client[1].uid,
       name: client[1].name,
       status: client[1].status,
