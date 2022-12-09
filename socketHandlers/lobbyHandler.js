@@ -25,7 +25,6 @@ const lobbyHandler = (client, io) => {
     client.uid = uid;
     console.info(`player ${name}(${uid}) enters lobby.`);
     clientController.addClient(client);
-    preGameController.removeClient(client.uid);
     clientController.setStatus(client.uid, PLAYER_STATUS.IN_LOBBY);
     client.join('lobby');
     announce();
@@ -35,6 +34,7 @@ const lobbyHandler = (client, io) => {
     io.in('lobby').emit('pregames-public-list', {
       gameList: preGameController.list,
     });
+    console.log('games are listed', ...preGameController.list);
     io.in('lobby').emit('players-all', { players: clientController.players });
   };
 
@@ -63,6 +63,7 @@ const lobbyHandler = (client, io) => {
   const onLeavePreGame = (client) => {
     preGameController.removeClient(client.uid);
     clientController.setStatus(client.uid, PLAYER_STATUS.IN_LOBBY);
+    console.log('player left pregame.');
     client.join('lobby');
     announce();
   };
