@@ -39,7 +39,7 @@ class PreGameController {
   removeClient = (clientUid) => {
     const preGame = this.#getGameByClient(clientUid);
     preGame?.removeClient(clientUid);
-    preGame?.playersAmount === 0 && this.#remove(PreGame.id);
+    preGame?.playersAmount === 0 && this.#remove(preGame.id);
   };
 
   kickClient = (admin, clientUid) => {
@@ -150,6 +150,7 @@ class PreGame {
 
     if (client.uid === this.#admin.uid) {
       this.#announce('pre-game-admin-left', {});
+      this.#clients.delete(clientUid);
       return;
     }
     this.#clients.delete(clientUid);
