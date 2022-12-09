@@ -31,7 +31,10 @@ class ClientController {
   }
 
   setStatus = (clientUid, status) => {
-    this.#clients.get(clientUid).status = status;
+    const client = this.#clients.get(clientUid);
+    if (client) {
+      client.status = status;
+    }
   };
 
   getStatus = (clientUid) => {
