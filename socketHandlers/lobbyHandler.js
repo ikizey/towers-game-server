@@ -25,6 +25,7 @@ const lobbyHandler = (client, io) => {
     client.uid = uid;
     console.info(`player ${name}(${uid}) enters lobby.`);
     clientController.addClient(client);
+    preGameController.removeClient(client.uid);
     clientController.setStatus(client.uid, PLAYER_STATUS.IN_LOBBY);
     client.join('lobby');
     announce();
